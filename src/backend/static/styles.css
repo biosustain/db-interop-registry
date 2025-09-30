@@ -1,0 +1,18 @@
+body {
+    min-height: 75rem;
+    padding-top: 4.5rem;
+}
+
+.interop-list-table {
+  max-width: 650px;
+}
+
+.interop-results-bar {
+  height: 50px;
+  padding: 10px;
+}
+
+.interop-results-table {
+  height: 50px;
+  padding: 10px;
+}

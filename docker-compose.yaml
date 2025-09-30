@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${DBPASS:?database password not set}
+      POSTGRES_USER: ${DBUSER:?database user not set}
+      POSTGRES_DB: ${DBNAME:?database name not set}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DBUSER} -d ${DBNAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5433:5432"
+    networks:
+      - postgres-net
+  app:
+    build:
+      context: ./src
+    entrypoint: /code/entrypoint-dev.sh
+    env_file:
+      - .env
+    ports:
+      - 50505:50505
+    volumes:
+      - ./src:/code
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - postgres-net
+
+volumes:
+ postgres-data:
+
+networks:
+  postgres-net:

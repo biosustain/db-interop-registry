@@ -1,0 +1,38 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.black]
+target-version =  ["py311"]
+line-length = 120
+extend-exclude = '''
+(
+  ^/src/migrations\/
+)
+'''
+force-exclude = '''
+# Needed for pre-commit
+(
+  ^/src/migrations\/
+)
+'''
+
+[tool.pytest.ini_options]
+addopts = "-ra --cov=src/backend"
+testpaths = [
+  "src/backend/tests"
+]
+pythonpath = [
+  "src"
+]
+env_files = ['.env']
+
+[tool.coverage.run]
+omit = ["src/backend/tests/*", "src/backend/settings/production.py"]
+
+[tool.coverage.report]
+show_missing = true

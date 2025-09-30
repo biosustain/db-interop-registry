@@ -1,0 +1,39 @@
+{
+  "entities": [
+    {
+      "source_db": "ALEdb",
+      "entity_type": "gene",
+      "local_id": "rpoB"
+    },
+    {
+      "source_db": "ALEdb",
+      "entity_type": "gene",
+      "local_id": "mrcB"
+    },
+    {
+      "source_db": "Pankb",
+      "entity_type": "gene",
+      "local_id": "mrcB"
+    },    
+    {
+      "source_db": "ALEdb", 
+      "entity_type": "strain",
+      "local_id": "1280"
+    },
+    {
+      "source_db": "ALEdb",
+      "entity_type": "gene", 
+      "local_id": "KJJPFECL_00960"
+    },
+    {
+      "source_db": "PMKbase",
+      "entity_type": "strain",
+      "local_id": "BW25113"
+    },
+    {
+      "source_db": "Bigg",
+      "entity_type": "strain",
+      "local_id": "511145"
+    }
+  ]
+}
