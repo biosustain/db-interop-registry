@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from utils.list import list_registry
 from utils.ingest import ingest_entities
+from utils.ingest_bulk import ingest_bulk_entities
 from utils.cleanup import cleanup_all_data, cleanup_entities
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,6 +22,11 @@ def ingest(file_path: Path) -> None:
     ingest_entities(file_path)
     pass
 
+
+def ingest_bulk() -> None:
+    """Ingest entities from internal databases."""
+    ingest_bulk_entities()
+    pass
 
 def update(file_path: Path) -> None:
     """Update entities from JSON file."""
@@ -52,9 +58,12 @@ def main():
     group.add_argument('--cleanup', type=Path, help='Cleanup entities from file')
     group.add_argument('--cleanup-all', action='store_true', help='Cleanup all entities')
     group.add_argument('--list', action='store_true', help='List all entities')
+    group.add_argument('--ingest-bulk', action='store_true', help='Ingest entities from internal databases')
     
     args = parser.parse_args()
-    
+
+    if args.ingest_bulk:
+        ingest_bulk()
     if args.ingest:
         ingest(args.ingest)
     elif args.update:
