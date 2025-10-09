@@ -49,7 +49,17 @@ def generate_uid(entity_type: str, local_id: str) -> str:
     return f"{prefix}{hash_digest.upper()}"
 
 
-def get_source_db_id(db_session, db_name: str) -> int:
+def build_source_db_cache(db_session) -> dict[str, int]:
+    """Return a mapping of source database names to their IDs."""
+    return {row.db_name: row.id for row in db_session.query(SourceDb).all()}
+
+
+def build_entity_type_cache(db_session) -> dict[str, int]:
+    """Return a mapping of normalised entity type names to their IDs."""
+    return {row.name.lower(): row.id for row in db_session.query(Entity).all()}
+
+
+def get_source_db_id(db_session, db_name: str, cache: dict[str, int] | None = None) -> int:
     """
     Get the source_db_id for a given database name.
 
@@ -63,19 +73,22 @@ def get_source_db_id(db_session, db_name: str) -> int:
     Raises:
         ValueError: If database name not found
     """
-    print(f"Looking up source database ID for '{db_name}'...")
+    if cache is not None and db_name in cache:
+        return cache[db_name]
+
     source_db = db_session.query(SourceDb).filter(SourceDb.db_name == db_name).first()
 
     if not source_db:
-        print(f"Error: Source database '{db_name}' not found in the database.")
         available_dbs = db_session.query(SourceDb.db_name).all()
         available_names = [db.db_name for db in available_dbs]
         raise ValueError(f"Source database '{db_name}' not found. Available databases: {available_names}")
 
+    if cache is not None:
+        cache[db_name] = source_db.id
     return source_db.id
 
 
-def get_entity_type_id(db_session, entity_type: str) -> int:
+def get_entity_type_id(db_session, entity_type: str, cache: dict[str, int] | None = None) -> int:
     """
     Get the entity_type_id for a given entity type.
 
@@ -89,12 +102,19 @@ def get_entity_type_id(db_session, entity_type: str) -> int:
     Raises:
         ValueError: If entity type not found
     """
+    lookup_key = entity_type.lower()
+
+    if cache is not None and lookup_key in cache:
+        return cache[lookup_key]
+
     entity = db_session.query(Entity).filter(Entity.name.ilike(entity_type)).first()
     if not entity:
         available_entities = db_session.query(Entity.name).all()
         available_names = [e.name for e in available_entities]
         raise ValueError(f"Entity type '{entity_type}' not found. Available types: {available_names}")
 
+    if cache is not None:
+        cache[lookup_key] = entity.id
     return entity.id
 
 
@@ -103,7 +123,13 @@ def start_ingest(session, entities: list) -> None:
         successful_ingests = 0
         failed_ingests = 0
 
+        source_db_cache = build_source_db_cache(session)
+        entity_type_cache = build_entity_type_cache(session)
+
         for i, entity in enumerate(entities, 1):
+            # if i is a multiple of 100 print progress
+            if i % 100 == 0:
+                print(f"Processed {i} entities... Successful: {successful_ingests}, Failed: {failed_ingests}")
             try:
                 required_fields = ["source_db", "entity_type", "local_id"]
                 for field in required_fields:
@@ -114,14 +140,11 @@ def start_ingest(session, entities: list) -> None:
                 entity_type = validate_entity_type(entity["entity_type"])
                 local_id = entity["local_id"]
 
-                print(f"Processing entity {i}/{len(entities)}: {source_db_name} | {entity_type} | {local_id}")
-
-                source_db_id = get_source_db_id(session, source_db_name)
-                entity_type_id = get_entity_type_id(session, entity_type)
+                source_db_id = get_source_db_id(session, source_db_name, cache=source_db_cache)
+                entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
 
                 # Generate UID
                 uid = generate_uid(entity_type, local_id)
-                print(f"   Generated UID: {uid}")
 
                 # Check if registry entry already exists
                 existing_registry = (
@@ -135,7 +158,7 @@ def start_ingest(session, entities: list) -> None:
                 )
 
                 if existing_registry:
-                    print("Registry entry already exists...")
+                    existing_registry.updated_at = datetime.datetime.now()
                 else:
                     # Create registry entry
                     registry_entry = Registry(
@@ -143,7 +166,6 @@ def start_ingest(session, entities: list) -> None:
                     )
 
                     session.add(registry_entry)
-                    print("Added to registry table")
 
                 # Check if mapping already exists
                 existing_mapping = (
@@ -159,20 +181,17 @@ def start_ingest(session, entities: list) -> None:
                 if existing_mapping:
                     # Update existing mapping
                     existing_mapping.uid = uid
-                    existing_mapping.updated_at = datetime.datetime.now(datetime.UTC)
-                    print("   Updated existing mapping")
+                    existing_mapping.updated_at = datetime.datetime.now()
                 else:
                     # Create new mapping entry
                     mapping_entry = Mapping(
                         source_db_id=source_db_id, entity_type_id=entity_type_id, local_id=local_id, uid=uid
                     )
                     session.add(mapping_entry)
-                    print("Added to mapping table")
 
                 # Commit this entity
                 session.commit()
                 successful_ingests += 1
-                print(f"Entity {i} ingested successfully!")
             except Exception as e:
                 print(f"Error processing entity {i}: {e}")
                 failed_ingests += 1
@@ -209,5 +228,9 @@ def ingest_entities(file_path: Path):
 
     session = get_session()
 
+    start_time = datetime.time.time()
     print(f"Starting ingestion of {len(entities)} entities...")
     start_ingest(session, entities)
+    end_time = datetime.time.time()
+    elapsed_time = end_time - start_time
+    print(f"Ingestion completed in {elapsed_time:.2f} seconds.")

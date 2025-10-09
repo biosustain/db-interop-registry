@@ -94,6 +94,10 @@ def ingest_bulk_entities() -> Dict[str, List[Dict[str, str]]]:
     }
 
     for entity in combined_entities["entities"]:
+        # if entity type is strain, skip cleanup
+        if entity["entity_type"] == "strain":
+            continue
+
         local_id = entity["local_id"]
 
         if " " in local_id:

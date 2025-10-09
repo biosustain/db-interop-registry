@@ -1,5 +1,5 @@
-from flask import jsonify, render_template
-from sqlalchemy import select
+from flask import jsonify, render_template, request
+from sqlalchemy import or_, select
 
 from backend import db
 from backend.interop import bp
@@ -70,6 +70,13 @@ def index():
     ---
     tags:
       - Registry
+    parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        required: false
+        description: Search term applied to UID or local ID.
     responses:
       200:
         description: HTML page containing registry mappings.
@@ -78,5 +85,22 @@ def index():
             schema:
               type: string
     """
-    mappings = db.session.execute(select(Mapping)).scalars().all()
-    return render_template("mappings_list.html", mappings=mappings)
+    search_query = request.args.get("q", "").strip()
+    stmt = select(Mapping).order_by(Mapping.updated_at.desc()).limit(100)
+
+    if search_query:
+        like_value = f"%{search_query}%"
+        stmt = (
+            select(Mapping)
+            .where(or_(Mapping.uid.ilike(like_value), Mapping.local_id.ilike(like_value)))
+            .order_by(Mapping.updated_at.desc())
+            .limit(100)
+        )
+
+    mappings = db.session.execute(stmt).scalars().all()
+    return render_template(
+        "mappings_list.html",
+        mappings=mappings,
+        search_query=search_query,
+        result_cap=100,
+    )

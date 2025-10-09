@@ -1,32 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Mapping List{% endblock %}
 {% block content %}
-      <h1>Mappings</h1>
+<h1>Mappings</h1>
 
-      {% if True %}
-          <table class="table mappings-list-table">
-              <thead>
-                  <tr>
-                      <th>Uid</th>
-                      <th>Local Id</th>
-                      <th>Updated At</th>
-                      <th>Source Db</th>
-                      <th>Entity Type</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  {% for mapping in mappings %}
-                      <tr>
-                          <td>{{ mapping.uid }}</td>
-                          <td>{{ mapping.local_id }}</td>
-                            <td>{{ mapping.updated_at }}</td>
-                            <td>{{ mapping.source_db_id }}</td>
-                            <td>{{ mapping.entity_type_id }}</td>
-                      </tr>
-                  {% endfor %}
-              </tbody>
-          </table>
-      {% else %}
-          <p>No mappings found! </p>
-      {% endif %}
+<form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
+    <div class="input-group">
+        <input
+            type="text"
+            name="q"
+            class="form-control"
+            placeholder="Search by UID or Local ID"
+            value="{{ search_query }}"
+            aria-label="Search mappings"
+        />
+        <button class="btn btn-primary" type="submit">Search</button>
+    </div>
+</form>
+
+{% if mappings %}
+<p class="text-muted">
+    Showing up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.
+</p>
+<table class="table mappings-list-table">
+    <thead>
+        <tr>
+            <th>Uid</th>
+            <th>Local Id</th>
+            <th>Updated At</th>
+            <th>Source Db</th>
+            <th>Entity Type</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mapping in mappings %}
+        <tr>
+            <td>{{ mapping.uid }}</td>
+            <td>{{ mapping.local_id }}</td>
+            <td>{{ mapping.updated_at }}</td>
+            <td>{{ mapping.source_db_id }}</td>
+            <td>{{ mapping.entity_type_id }}</td>
+            <td class="text-end">
+                {% if mapping.entity_type_id == 1 %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=mapping.local_id) }}">
+                    Query
+                </a>
+                {% elif mapping.entity_type_id == 2 %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=mapping.local_id) }}">
+                    Query
+                </a>
+                {% else %}
+                <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Unsupported entity type">
+                    Query
+                </button>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No mappings found{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.</p>
+{% endif %}
 {% endblock %}
