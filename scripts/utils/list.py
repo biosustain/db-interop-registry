@@ -1,15 +1,13 @@
 """List utilities."""
-import sys
-import os
 
-from utils.models import Mapping
 from utils.db_connector import get_session
+from utils.models import Mapping
 
 
 def list_registry():
     """List all registry entries."""
     session = get_session()
-    
+
     try:
         mappings = session.query(Mapping).all()
 

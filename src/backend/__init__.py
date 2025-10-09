@@ -49,11 +49,11 @@ def create_app(config=None):
 def register_error_handlers(app):
     """Register custom error handlers for the application."""
     from backend.interop.utils.exceptions import (
-        ResourceNotFoundError,
+        DatabaseInconsistencyError,
         InvalidResourceTypeError,
-        DatabaseInconsistencyError
+        ResourceNotFoundError,
     )
-    
+
     def handle_resource_not_found(e):
         return jsonify({"detail": e.detail}), e.status_code
 
@@ -62,7 +62,7 @@ def register_error_handlers(app):
 
     def handle_database_inconsistency(e):
         return jsonify({"detail": e.detail}), e.status_code
-    
+
     # Register them explicitly
     app.register_error_handler(ResourceNotFoundError, handle_resource_not_found)
     app.register_error_handler(InvalidResourceTypeError, handle_invalid_resource_type)
