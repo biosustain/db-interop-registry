@@ -350,6 +350,7 @@ MigrationBackup/
 .ionide/
 
 # Virtual environment and .env
+venv
 .venv
 .env
 .azure

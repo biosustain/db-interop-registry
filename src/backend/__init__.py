@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
+from flasgger import Swagger
 
 
 class BaseModel(DeclarativeBase):
@@ -14,6 +15,30 @@ class BaseModel(DeclarativeBase):
 db = SQLAlchemy(model_class=BaseModel)
 migrate = Migrate()
 csrf = CSRFProtect()
+SWAGGER_CONFIG = {
+    "openapi": "3.0.2",
+    "specs": [
+        {
+            "endpoint": "apispec_1",
+            "route": "/api/openapi.json",
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/apidocs_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/",
+    "headers": [],
+}
+
+SWAGGER_TEMPLATE = {
+    "info": {
+        "title": "Interop Registry API",
+        "description": "API documentation for Interop Registry services.",
+        "version": "1.0.0",
+    },
+    "tags": [{"name": "Registry", "description": "Registry operations"}],
+}
 
 
 def create_app(config=None):
@@ -42,6 +67,7 @@ def create_app(config=None):
     from backend.interop import bp as interop_bp
 
     app.register_blueprint(interop_bp)
+    Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
 
     return app
 

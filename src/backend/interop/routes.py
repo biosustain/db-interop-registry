@@ -10,6 +10,47 @@ from backend.interop.services.registry import RegistryService
 
 @bp.route("/<resource>/<string:local_id_or_uid>", methods=["GET"])
 def get_registry_item(resource, local_id_or_uid):
+    """
+    Retrieve a registry item by resource type and identifier.
+    ---
+    tags:
+      - Registry
+    parameters:
+      - in: path
+        name: resource
+        required: true
+        schema:
+          type: string
+          enum: ["gene", "strain"]
+        description: Type of resource to fetch.
+      - in: path
+        name: local_id_or_uid
+        required: true
+        schema:
+          type: string
+        description: Local identifier or UID of the resource.
+    responses:
+      200:
+        description: Registry item located.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      400:
+        description: Invalid resource type supplied.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+      404:
+        description: Registry item not found.
+      500:
+        description: Unexpected server error.
+    """
     # Validate resource type
     try:
         resource_type = ResourceType(resource)
@@ -24,5 +65,18 @@ def get_registry_item(resource, local_id_or_uid):
 
 @bp.route("/", methods=["GET"])
 def index():
+    """
+    Render the HTML view of available mappings.
+    ---
+    tags:
+      - Registry
+    responses:
+      200:
+        description: HTML page containing registry mappings.
+        content:
+          text/html:
+            schema:
+              type: string
+    """
     mappings = db.session.execute(select(Mapping)).scalars().all()
     return render_template("mappings_list.html", mappings=mappings)
