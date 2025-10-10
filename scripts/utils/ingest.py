@@ -6,8 +6,12 @@ import json
 import sys
 from pathlib import Path
 
+from sqlalchemy import tuple_
+
 from utils.db_connector import get_session
 from utils.models import Entity, Mapping, Registry, SourceDb
+
+BATCH_SIZE = 5_000
 
 
 def validate_entity_type(entity_type: str) -> str:
@@ -118,90 +122,151 @@ def get_entity_type_id(db_session, entity_type: str, cache: dict[str, int] | Non
     return entity.id
 
 
-def start_ingest(session, entities: list) -> None:
-    try:
-        successful_ingests = 0
-        failed_ingests = 0
+def _process_batch(session, batch, source_db_cache, entity_type_cache):
+    """Process a batch, returning (successful_count, failed_count)."""
+    prepared = []
+    failures = 0
 
-        source_db_cache = build_source_db_cache(session)
-        entity_type_cache = build_entity_type_cache(session)
+    for idx, entity in batch:
+        try:
+            required_fields = ["source_db", "entity_type", "local_id"]
+            for field in required_fields:
+                if field not in entity:
+                    raise ValueError(f"Missing required field: {field}")
 
-        for i, entity in enumerate(entities, 1):
-            # if i is a multiple of 100 print progress
-            if i % 100 == 0:
-                print(f"Processed {i} entities... Successful: {successful_ingests}, Failed: {failed_ingests}")
+            source_db_name = entity["source_db"]
+            entity_type = validate_entity_type(entity["entity_type"])
+            local_id = entity["local_id"]
+
+            source_db_id = get_source_db_id(session, source_db_name, cache=source_db_cache)
+            entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
+            uid = generate_uid(entity_type, local_id)
+
+            prepared.append(
+                {
+                    "index": idx,
+                    "source_db_id": source_db_id,
+                    "entity_type_id": entity_type_id,
+                    "local_id": local_id,
+                    "uid": uid,
+                }
+            )
+        except Exception as exc:
+            print(f"Error processing entity {idx}: {exc}")
+            failures += 1
+
+    if not prepared:
+        return 0, failures
+
+    unique_payloads = {
+        (item["source_db_id"], item["entity_type_id"], item["local_id"]): item for item in prepared
+    }
+    keys = list(unique_payloads.keys())
+
+    existing_mappings = {}
+    existing_registries = {}
+    if keys:
+        existing_mappings = {
+            (m.source_db_id, m.entity_type_id, m.local_id): m
+            for m in session.query(Mapping)
+            .filter(tuple_(Mapping.source_db_id, Mapping.entity_type_id, Mapping.local_id).in_(keys))  # type: ignore[arg-type]
+        }
+
+        existing_registries = {
+            (r.source_db_id, r.entity_type_id, r.local_id): r
+            for r in session.query(Registry)
+            .filter(tuple_(Registry.source_db_id, Registry.entity_type_id, Registry.local_id).in_(keys))  # type: ignore[arg-type]
+        }
+
+    now = datetime.datetime.utcnow()
+    new_registry_rows: list[dict] = []
+    new_mapping_rows: list[dict] = []
+    mapping_updates: list[dict] = []
+
+    for key, payload in unique_payloads.items():
+        source_db_id, entity_type_id, local_id = key
+
+        if key not in existing_registries:
+            new_registry_rows.append(
+                {
+                    "source_db_id": source_db_id,
+                    "entity_type_id": entity_type_id,
+                    "local_id": local_id,
+                }
+            )
+
+        if key in existing_mappings:
+            mapping_updates.append(
+                {
+                    "source_db_id": source_db_id,
+                    "entity_type_id": entity_type_id,
+                    "local_id": local_id,
+                    "uid": payload["uid"],
+                    "updated_at": now,
+                }
+            )
+        else:
+            new_mapping_rows.append(
+                {
+                    "source_db_id": source_db_id,
+                    "entity_type_id": entity_type_id,
+                    "local_id": local_id,
+                    "uid": payload["uid"],
+                    "updated_at": now,
+                }
+            )
+
+    if new_registry_rows:
+        session.bulk_insert_mappings(Registry, new_registry_rows)
+    if new_mapping_rows:
+        session.bulk_insert_mappings(Mapping, new_mapping_rows)
+    if mapping_updates:
+        session.bulk_update_mappings(Mapping, mapping_updates)
+
+    return len(prepared), failures
+
+
+def start_ingest(session, entities: list[dict], chunk_size: int = BATCH_SIZE) -> None:
+    source_db_cache = build_source_db_cache(session)
+    entity_type_cache = build_entity_type_cache(session)
+
+    successful_ingests = 0
+    failed_ingests = 0
+
+    batch = []
+
+    for idx, entity in enumerate(entities, 1):
+        batch.append((idx, entity))
+
+        if len(batch) >= chunk_size:
+            success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
             try:
-                required_fields = ["source_db", "entity_type", "local_id"]
-                for field in required_fields:
-                    if field not in entity:
-                        raise ValueError(f"Missing required field: {field}")
-
-                source_db_name = entity["source_db"]
-                entity_type = validate_entity_type(entity["entity_type"])
-                local_id = entity["local_id"]
-
-                source_db_id = get_source_db_id(session, source_db_name, cache=source_db_cache)
-                entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
-
-                # Generate UID
-                uid = generate_uid(entity_type, local_id)
-
-                # Check if registry entry already exists
-                existing_registry = (
-                    session.query(Registry)
-                    .filter(
-                        Registry.source_db_id == source_db_id,
-                        Registry.entity_type_id == entity_type_id,
-                        Registry.local_id == local_id,
-                    )
-                    .first()
-                )
-
-                if existing_registry:
-                    existing_registry.updated_at = datetime.datetime.now()
-                else:
-                    # Create registry entry
-                    registry_entry = Registry(
-                        source_db_id=source_db_id, entity_type_id=entity_type_id, local_id=local_id
-                    )
-
-                    session.add(registry_entry)
-
-                # Check if mapping already exists
-                existing_mapping = (
-                    session.query(Mapping)
-                    .filter(
-                        Mapping.source_db_id == source_db_id,
-                        Mapping.entity_type_id == entity_type_id,
-                        Mapping.local_id == local_id,
-                    )
-                    .first()
-                )
-
-                if existing_mapping:
-                    # Update existing mapping
-                    existing_mapping.uid = uid
-                    existing_mapping.updated_at = datetime.datetime.now()
-                else:
-                    # Create new mapping entry
-                    mapping_entry = Mapping(
-                        source_db_id=source_db_id, entity_type_id=entity_type_id, local_id=local_id, uid=uid
-                    )
-                    session.add(mapping_entry)
-
-                # Commit this entity
                 session.commit()
-                successful_ingests += 1
-            except Exception as e:
-                print(f"Error processing entity {i}: {e}")
-                failed_ingests += 1
-                continue
-    except Exception as e:
-        print(f"Fatal error during ingestion: {e}")
-        sys.exit(1)
+            except Exception:
+                session.rollback()
+                raise
+            successful_ingests += success
+            failed_ingests += failure
+            batch.clear()
 
-    finally:
-        session.close()
+            processed = successful_ingests + failed_ingests
+            if processed % 1_000 == 0:
+                print(f"Processed {processed} entities... Successful: {successful_ingests}, Failed: {failed_ingests}")
+
+    if batch:
+        success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        successful_ingests += success
+        failed_ingests += failure
+
+    print(
+        f"Ingestion finished. Total processed: {successful_ingests + failed_ingests}. "
+        f"Successful: {successful_ingests}, Failed: {failed_ingests}"
+    )
 
 
 def ingest_entities(file_path: Path):

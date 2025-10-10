@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Mapping List{% endblock %}
 {% block content %}
-<h1>Mappings</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Mappings</h1>
+    <a class="btn btn-outline-danger" href="{{ url_for('flasgger.apidocs') }}" target="_blank" rel="noopener">
+        View API Docs
+    </a>
+</div>
 
 <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
     <div class="input-group">
@@ -18,35 +23,32 @@
 </form>
 
 {% if mappings %}
+{% set total_display = total_count if total_count is not none else None %}
 <p class="text-muted">
-    Showing up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.
+    Total entities in registry: {% if total_display is not none %}{{ '{:,}'.format(total_display) }}{% else %}unknown{% endif %}.<br />
+    Displaying up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}{% if search_query %} matching "<strong>{{ search_query }}</strong>"{% endif %}.
 </p>
 <table class="table mappings-list-table">
     <thead>
         <tr>
+            <th></th>
             <th>Uid</th>
             <th>Local Id</th>
-            <th>Updated At</th>
             <th>Source Db</th>
             <th>Entity Type</th>
-            <th></th>
+            <th>Updated At</th>
         </tr>
     </thead>
     <tbody>
-        {% for mapping in mappings %}
+        {% for item in mappings %}
         <tr>
-            <td>{{ mapping.uid }}</td>
-            <td>{{ mapping.local_id }}</td>
-            <td>{{ mapping.updated_at }}</td>
-            <td>{{ mapping.source_db_id }}</td>
-            <td>{{ mapping.entity_type_id }}</td>
-            <td class="text-end">
-                {% if mapping.entity_type_id == 1 %}
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=mapping.local_id) }}">
+            <td class="text-start">
+                {% if item.mapping.entity_type_id == 1 %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=item.mapping.local_id) }}">
                     Query
                 </a>
-                {% elif mapping.entity_type_id == 2 %}
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=mapping.local_id) }}">
+                {% elif item.mapping.entity_type_id == 2 %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=item.mapping.local_id) }}">
                     Query
                 </a>
                 {% else %}
@@ -55,6 +57,11 @@
                 </button>
                 {% endif %}
             </td>
+            <td>{{ item.mapping.uid }}</td>
+            <td>{{ item.mapping.local_id }}</td>
+            <td>{{ item.source_db_name }}</td>
+            <td>{{ item.mapping.entity_type_id }}</td>
+            <td>{{ item.mapping.updated_at }}</td>
         </tr>
         {% endfor %}
     </tbody>
