@@ -4,7 +4,7 @@ from sqlalchemy import or_, select
 from backend import db
 from backend.interop import bp
 from backend.interop.enums import ResourceType
-from backend.interop.models import Mapping, SourceDb
+from backend.interop.models import Entity, Mapping, SourceDb
 from backend.interop.services.registry import RegistryService
 
 
@@ -88,8 +88,13 @@ def index():
     search_query = request.args.get("q", "").strip()
     total_count = db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
     stmt = (
-        select(Mapping, SourceDb.db_name.label("source_db_name"))
+        select(
+            Mapping,
+            SourceDb.db_name.label("source_db_name"),
+            Entity.name.label("entity_type_name"),
+        )
         .join(SourceDb, Mapping.source_db_id == SourceDb.id)
+        .join(Entity, Mapping.entity_type_id == Entity.id)
         .order_by(Mapping.updated_at.desc())
         .limit(100)
     )
@@ -100,8 +105,12 @@ def index():
 
     result = db.session.execute(stmt).all()
     mappings = [
-        {"mapping": mapping, "source_db_name": source_db_name}
-        for mapping, source_db_name in result
+        {
+            "mapping": mapping,
+            "source_db_name": source_db_name,
+            "entity_type_name": entity_type_name,
+        }
+        for mapping, source_db_name, entity_type_name in result
     ]
     return render_template(
         "mappings_list.html",
