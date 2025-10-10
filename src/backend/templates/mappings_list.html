@@ -4,26 +4,26 @@
     {{ super() }}
     <style>
         .detail-overlay {
-            position: absolute;
-            top: 0;
-            right: 0;
+            position: fixed;
+            top: 100px;
+            right: 2rem;
             width: min(40%, 480px);
             min-width: 320px;
-            z-index: 20;
+            z-index: 1050;
         }
 
         .detail-overlay .card {
-            max-height: calc(100vh - 180px);
+            max-height: calc(100vh - 140px);
             overflow: auto;
         }
 
         @media (max-width: 991.98px) {
             .detail-overlay {
-                width: 100%;
+                width: calc(100% - 2rem);
                 position: fixed;
                 top: 80px;
-                right: 0;
-                left: 0;
+                right: 1rem;
+                left: 1rem;
             }
         }
     </style>
