@@ -63,6 +63,45 @@ def get_registry_item(resource, local_id_or_uid):
     return jsonify(result), 200
 
 
+@bp.route("/pair/<path:pair_identifiers>", methods=["GET"])
+def get_registry_pair(pair_identifiers: str):
+    """
+    Retrieve registry information for a gene/strain pair.
+    ---
+    tags:
+      - Registry
+    parameters:
+      - in: path
+        name: pair_identifiers
+        required: true
+        schema:
+          type: string
+        description: Comma-separated identifiers, e.g. thrL,GCF_000005845.2.
+    responses:
+      200:
+        description: Pair interop payload.
+        content:
+          application/json:
+            schema:
+              type: object
+      400:
+        description: Invalid pair identifier supplied.
+      500:
+        description: Unexpected server error.
+    """
+    try:
+        gene_id, strain_id = [segment.strip() for segment in pair_identifiers.split(",", 1)]
+    except ValueError:
+        return jsonify({"error": "Pair identifier must include both gene and strain separated by a comma"}), 400
+
+    if not gene_id or not strain_id:
+        return jsonify({"error": "Gene and strain identifiers must both be provided"}), 400
+
+    service = RegistryService(db)
+    result = service.get_pair(gene_id=gene_id, strain_id=strain_id)
+    return jsonify(result), 200
+
+
 @bp.route("/", methods=["GET"])
 def index():
     """

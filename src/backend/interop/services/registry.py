@@ -60,6 +60,13 @@ class RegistryService:
             "attributes": attribute_list,
         }
 
+    def get_pair(self, gene_id: str, strain_id: str) -> dict:
+        """Retrieve pair-based interop data directly from external services."""
+        if not gene_id or not strain_id:
+            raise InvalidResourceTypeError("Pair requests must include both gene and strain identifiers")
+
+        return self.interop_service.fetch_pair_attributes(gene_id=gene_id, strain_id=strain_id)
+
     def _get_entity_type(self, resource: str) -> Entity:
         """Get entity type from database."""
         entity_type = self.db.session.query(Entity).filter(Entity.name == resource).first()
