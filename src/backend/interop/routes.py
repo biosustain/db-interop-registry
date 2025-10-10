@@ -96,7 +96,7 @@ def index():
         .join(SourceDb, Mapping.source_db_id == SourceDb.id)
         .join(Entity, Mapping.entity_type_id == Entity.id)
         .order_by(Mapping.updated_at.desc())
-        .limit(100)
+        .limit(1000)
     )
 
     if search_query:
@@ -116,6 +116,6 @@ def index():
         "mappings_list.html",
         mappings=mappings,
         search_query=search_query,
-        result_cap=100,
+        result_cap=1000,
         total_count=total_count,
     )

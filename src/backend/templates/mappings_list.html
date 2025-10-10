@@ -1,5 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Mapping List{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style>
+        .detail-overlay {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: min(40%, 480px);
+            min-width: 320px;
+            z-index: 20;
+        }
+
+        .detail-overlay .card {
+            max-height: calc(100vh - 180px);
+            overflow: auto;
+        }
+
+        @media (max-width: 991.98px) {
+            .detail-overlay {
+                width: 100%;
+                position: fixed;
+                top: 80px;
+                right: 0;
+                left: 0;
+            }
+        }
+    </style>
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="mb-0">Mappings</h1>
@@ -22,7 +50,9 @@
     </div>
 </form>
 
-{% if mappings %}
+<div class="position-relative">
+    <div id="mappings-column">
+        {% if mappings %}
 {% set total_display = total_count if total_count is not none else None %}
 <p class="text-muted">
     Total entities in registry: {% if total_display is not none %}{{ '{:,}'.format(total_display) }}{% else %}unknown{% endif %}.<br />
@@ -44,13 +74,23 @@
         <tr>
             <td class="text-start">
                 {% if item.mapping.entity_type_id == 1 %}
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=item.mapping.local_id) }}">
-                    Query
-                </a>
+                <div class="btn-group" role="group">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=item.mapping.local_id) }}" target="_blank" rel="noopener">
+                        Query
+                    </a>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview" data-resource="gene" data-local-id="{{ item.mapping.local_id }}">
+                        Preview
+                    </button>
+                </div>
                 {% elif item.mapping.entity_type_id == 2 %}
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=item.mapping.local_id) }}">
-                    Query
-                </a>
+                <div class="btn-group" role="group">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=item.mapping.local_id) }}" target="_blank" rel="noopener">
+                        Query
+                    </a>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview" data-resource="strain" data-local-id="{{ item.mapping.local_id }}">
+                        Preview
+                    </button>
+                </div>
                 {% else %}
                 <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Unsupported entity type">
                     Query
@@ -65,8 +105,63 @@
         </tr>
         {% endfor %}
     </tbody>
-</table>
-{% else %}
+        </table>
+        {% else %}
 <p>No mappings found{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.</p>
-{% endif %}
+        {% endif %}
+    </div>
+    <div id="detail-column" class="detail-overlay d-none">
+        <div id="detail-container" class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Details</span>
+                <button id="detail-close" type="button" class="btn btn-link text-danger p-0" aria-label="Close details">&times;</button>
+            </div>
+            <div class="card-body">
+                <pre id="detail-output" class="mb-0">Select a mapping to preview JSON response.</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const detailOutput = document.getElementById('detail-output');
+    const detailContainer = document.getElementById('detail-container');
+    const detailColumn = document.getElementById('detail-column');
+    const detailClose = document.getElementById('detail-close');
+
+    document.querySelectorAll('button[data-action="preview"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const resource = button.dataset.resource;
+            const localId = button.dataset.localId;
+
+            detailOutput.textContent = 'Loading...';
+            detailContainer.classList.remove('d-none');
+            detailColumn.classList.remove('d-none');
+
+            try {
+                const response = await fetch(`/${resource}/${encodeURIComponent(localId)}`);
+                if (!response.ok) {
+                    const text = await response.text();
+                    detailOutput.textContent = `Error ${response.status}: ${text}`;
+                    return;
+                }
+
+                const data = await response.json();
+                detailOutput.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                detailOutput.textContent = `Failed to fetch data: ${error}`;
+            }
+        });
+    });
+
+    detailClose.addEventListener('click', () => {
+        detailContainer.classList.add('d-none');
+        detailColumn.classList.add('d-none');
+        detailOutput.textContent = 'Select a mapping to preview JSON response.';
+    });
+});
+</script>
 {% endblock %}
