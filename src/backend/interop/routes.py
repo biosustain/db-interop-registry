@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from flask import jsonify, render_template, request
 from sqlalchemy import or_, select
 
@@ -151,6 +153,12 @@ def index():
         stmt = stmt.where(or_(Mapping.uid.ilike(like_value), Mapping.local_id.ilike(like_value)))
 
     result = db.session.execute(stmt).all()
+    def _format_updated_at(dt):
+        if dt is None:
+            return "Unknown"
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
     result_entity_counts = {"gene": 0, "strain": 0}
     for mapping, source_db_name, entity_type_name in result:
         entity_key = entity_type_name.lower()
@@ -162,6 +170,7 @@ def index():
             "mapping": mapping,
             "source_db_name": source_db_name,
             "entity_type_name": entity_type_name,
+            "updated_at_display": _format_updated_at(mapping.updated_at),
         }
         for mapping, source_db_name, entity_type_name in result
     ]
