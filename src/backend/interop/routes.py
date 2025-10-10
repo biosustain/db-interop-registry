@@ -126,6 +126,14 @@ def index():
     """
     search_query = request.args.get("q", "").strip()
     total_count = db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
+    entity_counts_result = db.session.execute(
+        select(Entity.name, db.func.count(Mapping.uid))
+        .join(Mapping, Mapping.entity_type_id == Entity.id)
+        .group_by(Entity.name)
+    ).all()
+    entity_counts = {name.lower(): count for name, count in entity_counts_result}
+    gene_count = entity_counts.get("gene", 0)
+    strain_count = entity_counts.get("strain", 0)
     stmt = (
         select(
             Mapping,
@@ -143,6 +151,12 @@ def index():
         stmt = stmt.where(or_(Mapping.uid.ilike(like_value), Mapping.local_id.ilike(like_value)))
 
     result = db.session.execute(stmt).all()
+    result_entity_counts = {"gene": 0, "strain": 0}
+    for mapping, source_db_name, entity_type_name in result:
+        entity_key = entity_type_name.lower()
+        if entity_key in result_entity_counts:
+            result_entity_counts[entity_key] += 1
+
     mappings = [
         {
             "mapping": mapping,
@@ -157,4 +171,8 @@ def index():
         search_query=search_query,
         result_cap=1000,
         total_count=total_count,
+        gene_count=gene_count,
+        strain_count=strain_count,
+        result_gene_count=result_entity_counts["gene"],
+        result_strain_count=result_entity_counts["strain"],
     )

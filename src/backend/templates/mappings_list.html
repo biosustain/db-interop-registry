@@ -30,7 +30,7 @@
 {% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Mappings</h1>
+    <h1 class="mb-0">Registry Entities</h1>
     <a class="btn btn-outline-danger" href="{{ url_for('flasgger.apidocs') }}" target="_blank" rel="noopener">
         View API Docs
     </a>
@@ -54,9 +54,17 @@
     <div id="mappings-column">
         {% if mappings %}
 {% set total_display = total_count if total_count is not none else None %}
+{% set strain_display = '{:,}'.format(strain_count) if strain_count is not none else 'unknown' %}
+{% set gene_display = '{:,}'.format(gene_count) if gene_count is not none else 'unknown' %}
+{% set result_strain_display = '{:,}'.format(result_strain_count) if result_strain_count is not none else 'unknown' %}
+{% set result_gene_display = '{:,}'.format(result_gene_count) if result_gene_count is not none else 'unknown' %}
 <p class="text-muted">
-    Total entities in registry: {% if total_display is not none %}{{ '{:,}'.format(total_display) }}{% else %}unknown{% endif %}.<br />
-    Displaying up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}{% if search_query %} matching "<strong>{{ search_query }}</strong>"{% endif %}.
+    <span class="d-block mb-1">Total entities in registry: {% if total_display is not none %}{{ '{:,}'.format(total_display) }}{% else %}unknown{% endif %} ({{ strain_display }} strains, {{ gene_display }} genes)</span>
+    {% if search_query %}
+    <span>Displaying results matching <strong>{{ search_query }}</strong> ({{ result_strain_display }} strains, {{ result_gene_display }} genes)</span>
+    {% else %}
+    Displaying up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}
+    {% endif %}
 </p>
 <table class="table mappings-list-table">
     <thead>
