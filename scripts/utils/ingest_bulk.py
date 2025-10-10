@@ -1,6 +1,7 @@
 """Ingest from internal databases."""
 
 import sys
+import time
 import requests
 import re
 from typing import List, Dict
@@ -83,13 +84,17 @@ def ingest_bulk_entities() -> Dict[str, List[Dict[str, str]]]:
 
     print("Fetching entities from Pankb...")
     pankbEntities = get_entities("http://pankb-preprod.northeurope.cloudapp.azure.com/", "Pankb")
+
+    print("Fetching entities from BiGG...")
+    biggEntities = get_entities("http://biggr-prod.northeurope.cloudapp.azure.com/", "Bigg")
     
     # Combine all entities into one object
     combined_entities = {
         "entities": (
             aleDBEntities.get("entities", []) +
             pmkBaseEntities.get("entities", []) + 
-            pankbEntities.get("entities", [])
+            pankbEntities.get("entities", []) +
+            biggEntities.get("entities", [])
         )
     }
 
@@ -117,4 +122,11 @@ def ingest_bulk_entities() -> Dict[str, List[Dict[str, str]]]:
     session = get_session()
 
     print(f"Starting ingestion of {len(entities)} entities...")
+
+    start_time = time.time()
+    print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
     start_ingest(session, entities)
+    end_time = time.time()
+    print(f"End time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time))}")
+    print(f"Ingestion completed in {end_time - start_time:.2f} seconds.")
+    
