@@ -1,11 +1,11 @@
 import os
 
+from flasgger import Swagger
 from flask import Flask, jsonify
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
-from flasgger import Swagger
 
 
 class BaseModel(DeclarativeBase):

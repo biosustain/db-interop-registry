@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 from sqlalchemy import tuple_
-
 from utils.db_connector import get_session
 from utils.models import Entity, Mapping, Registry, SourceDb
 
@@ -158,9 +157,7 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     if not prepared:
         return 0, failures
 
-    unique_payloads = {
-        (item["source_db_id"], item["entity_type_id"], item["local_id"]): item for item in prepared
-    }
+    unique_payloads = {(item["source_db_id"], item["entity_type_id"], item["local_id"]): item for item in prepared}
     keys = list(unique_payloads.keys())
 
     existing_mappings = {}
@@ -168,14 +165,16 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     if keys:
         existing_mappings = {
             (m.source_db_id, m.entity_type_id, m.local_id): m
-            for m in session.query(Mapping)
-            .filter(tuple_(Mapping.source_db_id, Mapping.entity_type_id, Mapping.local_id).in_(keys))  # type: ignore[arg-type]
+            for m in session.query(Mapping).filter(
+                tuple_(Mapping.source_db_id, Mapping.entity_type_id, Mapping.local_id).in_(keys)
+            )  # type: ignore[arg-type]
         }
 
         existing_registries = {
             (r.source_db_id, r.entity_type_id, r.local_id): r
-            for r in session.query(Registry)
-            .filter(tuple_(Registry.source_db_id, Registry.entity_type_id, Registry.local_id).in_(keys))  # type: ignore[arg-type]
+            for r in session.query(Registry).filter(
+                tuple_(Registry.source_db_id, Registry.entity_type_id, Registry.local_id).in_(keys)
+            )  # type: ignore[arg-type]
         }
 
     now = datetime.datetime.utcnow()
