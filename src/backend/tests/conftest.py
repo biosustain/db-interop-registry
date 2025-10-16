@@ -50,3 +50,9 @@ def session(db, request):
 
     request.addfinalizer(teardown)
     return db.session
+
+
+@pytest.fixture()
+def client(app):
+    """Functional test client for route testing."""
+    return app.test_client()
