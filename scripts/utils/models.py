@@ -36,6 +36,14 @@ class Mapping(db.Model):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 
 
+class Synonym(db.Model):
+    __tablename__ = "synonyms"
+
+    uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    synonym: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), server_default=func.now())
+
+
 class Registry(db.Model):
     __tablename__ = "registry"
 

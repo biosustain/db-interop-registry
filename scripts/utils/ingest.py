@@ -4,12 +4,12 @@ import datetime
 import hashlib
 import json
 import sys
-from pathlib import Path
 import time
+from pathlib import Path
 
 from sqlalchemy import tuple_
 from utils.db_connector import get_session
-from utils.models import Entity, Mapping, Registry, SourceDb
+from utils.models import Entity, Mapping, Registry, SourceDb, Synonym
 
 BATCH_SIZE = 5_000
 
@@ -142,6 +142,24 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
             uid = generate_uid(entity_type, local_id)
 
+            raw_synonyms = entity.get("synonyms", [])
+            if raw_synonyms is None:
+                synonyms: list[str] = []
+            elif isinstance(raw_synonyms, str):
+                synonyms = [raw_synonyms.strip()] if raw_synonyms.strip() else []
+            elif isinstance(raw_synonyms, list):
+                synonyms = []
+                for synonym in raw_synonyms:
+                    if synonym is None:
+                        continue
+                    if not isinstance(synonym, str):
+                        synonym = str(synonym)
+                    cleaned = synonym.strip()
+                    if cleaned:
+                        synonyms.append(cleaned)
+            else:
+                raise ValueError("Synonyms must be a string or a list of strings")
+
             prepared.append(
                 {
                     "index": idx,
@@ -149,6 +167,7 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                     "entity_type_id": entity_type_id,
                     "local_id": local_id,
                     "uid": uid,
+                    "synonyms": synonyms,
                 }
             )
         except Exception as exc:
@@ -158,7 +177,17 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     if not prepared:
         return 0, failures
 
-    unique_payloads = {(item["source_db_id"], item["entity_type_id"], item["local_id"]): item for item in prepared}
+    unique_payloads: dict[tuple[int, int, str], dict] = {}
+    for item in prepared:
+        key = (item["source_db_id"], item["entity_type_id"], item["local_id"])
+        synonyms = set(item.get("synonyms", []))
+        if key in unique_payloads:
+            unique_payloads[key]["synonyms"].update(synonyms)
+        else:
+            dedup_item = dict(item)
+            dedup_item["synonyms"] = synonyms
+            unique_payloads[key] = dedup_item
+
     keys = list(unique_payloads.keys())
 
     existing_mappings = {}
@@ -222,6 +251,27 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
         session.bulk_insert_mappings(Mapping, new_mapping_rows)
     if mapping_updates:
         session.bulk_update_mappings(Mapping, mapping_updates)
+
+    synonym_uids = {payload["uid"] for payload in unique_payloads.values() if payload["synonyms"]}
+    new_synonym_rows: list[dict[str, str]] = []
+    existing_synonyms: set[tuple[str, str]] = set()
+
+    if synonym_uids:
+        existing_synonym_rows = session.query(Synonym).filter(Synonym.uid.in_(synonym_uids)).all()
+        existing_synonyms = {(row.uid, row.synonym) for row in existing_synonym_rows}
+
+    for payload in unique_payloads.values():
+        if not payload["synonyms"]:
+            continue
+        uid = payload["uid"]
+        for synonym in payload["synonyms"]:
+            key = (uid, synonym)
+            if key not in existing_synonyms:
+                existing_synonyms.add(key)
+                new_synonym_rows.append({"uid": uid, "synonym": synonym})
+
+    if new_synonym_rows:
+        session.bulk_insert_mappings(Synonym, new_synonym_rows)
 
     return len(prepared), failures
 
