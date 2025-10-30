@@ -5,6 +5,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+import time
 
 from sqlalchemy import tuple_
 from utils.db_connector import get_session
@@ -292,9 +293,11 @@ def ingest_entities(file_path: Path):
 
     session = get_session()
 
-    start_time = datetime.time.time()
     print(f"Starting ingestion of {len(entities)} entities...")
+
+    start_time = time.time()
+    print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
     start_ingest(session, entities)
-    end_time = datetime.time.time()
-    elapsed_time = end_time - start_time
-    print(f"Ingestion completed in {elapsed_time:.2f} seconds.")
+    end_time = time.time()
+    print(f"End time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(end_time))}")
+    print(f"Ingestion completed in {end_time - start_time:.2f} seconds.")

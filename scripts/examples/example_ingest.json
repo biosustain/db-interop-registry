@@ -3,7 +3,8 @@
     {
       "source_db": "ALEdb",
       "entity_type": "gene",
-      "local_id": "rpoB"
+      "local_id": "rpoB",
+      "synonyms": ["rpoB_9", "rpoB_4"]
     },
     {
       "source_db": "ALEdb",
@@ -13,7 +14,7 @@
     {
       "source_db": "Pankb",
       "entity_type": "gene",
-      "local_id": "mrcB"
+      "local_id": "rpoB_3"
     },    
     {
       "source_db": "ALEdb", 
