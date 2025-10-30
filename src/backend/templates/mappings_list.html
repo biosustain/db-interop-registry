@@ -72,6 +72,7 @@
             <th></th>
             <th>Uid</th>
             <th>Local Id</th>
+            <th>Synonyms</th>
             <th>Source Db</th>
             <th>Entity Type</th>
             <th>Updated At</th>
@@ -107,6 +108,13 @@
             </td>
             <td>{{ item.mapping.uid }}</td>
             <td>{{ item.mapping.local_id }}</td>
+            <td>
+                {% if item.synonyms %}
+                    {{ item.synonyms | join(', ') }}
+                {% else %}
+                    &mdash;
+                {% endif %}
+            </td>
             <td>{{ item.source_db_name }}</td>
             <td>{{ item.entity_type_name }}</td>
             <td>{{ item.updated_at_display }}</td>

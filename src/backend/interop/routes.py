@@ -6,7 +6,7 @@ from sqlalchemy import or_, select
 from backend import db
 from backend.interop import bp
 from backend.interop.enums import ResourceType
-from backend.interop.models import Entity, Mapping, SourceDb
+from backend.interop.models import Entity, Mapping, SourceDb, Synonym
 from backend.interop.services.registry import RegistryService
 
 
@@ -167,12 +167,26 @@ def index():
         if entity_key in result_entity_counts:
             result_entity_counts[entity_key] += 1
 
+    uid_list = [mapping.uid for mapping, _, _ in result if mapping.uid]
+    synonyms_by_uid: dict[str, list[str]] = {uid: [] for uid in uid_list}
+    if uid_list:
+        synonym_rows = db.session.execute(
+            select(Synonym.uid, Synonym.synonym).where(Synonym.uid.in_(uid_list))
+        ).all()
+        for uid, synonym in synonym_rows:
+            if synonym:
+                synonyms_by_uid.setdefault(uid, []).append(synonym)
+
+    for synonyms in synonyms_by_uid.values():
+        synonyms.sort()
+
     mappings = [
         {
             "mapping": mapping,
             "source_db_name": source_db_name,
             "entity_type_name": entity_type_name,
             "updated_at_display": _format_updated_at(mapping.updated_at),
+            "synonyms": synonyms_by_uid.get(mapping.uid, []),
         }
         for mapping, source_db_name, entity_type_name in result
     ]
