@@ -1,4 +1,4 @@
-from backend.interop.models import Entity, Mapping, Registry, SourceDb
+from backend.interop.models import Entity, Mapping, Registry, SourceDb, Synonym
 from backend.interop.services.interop import InteropService
 from backend.interop.utils.exceptions import DatabaseInconsistencyError, InvalidResourceTypeError, ResourceNotFoundError
 
@@ -34,8 +34,29 @@ class RegistryService:
         mapping_entry = self._resolve_mapping(local_id_or_uid, entity_type_id, resource)
         local_id = mapping_entry.local_id
 
-        # Get all rows from Mapping with mapping_entry.uid
-        all_mappings = self.db.session.query(Mapping).filter(Mapping.uid == mapping_entry.uid).all()
+        synonym_rows = (
+            self.db.session.query(Synonym.synonym)
+            .filter(Synonym.uid == mapping_entry.uid)
+            .all()
+        )
+        alternate_local_ids = [synonym for (synonym,) in synonym_rows if synonym]
+
+        related_uids = set()
+        if alternate_local_ids:
+            related_mappings = (
+                self.db.session.query(Mapping.uid)
+                .filter(
+                    Mapping.entity_type_id == entity_type_id,
+                    Mapping.local_id.in_(alternate_local_ids),
+                )
+                .all()
+            )
+            related_uids.update(uid for (uid,) in related_mappings if uid)
+
+        uid_group = {mapping_entry.uid, *related_uids}
+
+        # Get all rows from Mapping matching the UID group
+        all_mappings = self.db.session.query(Mapping).filter(Mapping.uid.in_(uid_group)).all()
 
         attribute_list = []
         for entity in all_mappings:
