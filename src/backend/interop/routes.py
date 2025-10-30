@@ -167,18 +167,42 @@ def index():
         if entity_key in result_entity_counts:
             result_entity_counts[entity_key] += 1
 
-    uid_list = [mapping.uid for mapping, _, _ in result if mapping.uid]
-    synonyms_by_uid: dict[str, list[str]] = {uid: [] for uid in uid_list}
-    if uid_list:
-        synonym_rows = db.session.execute(
-            select(Synonym.uid, Synonym.synonym).where(Synonym.uid.in_(uid_list))
-        ).all()
-        for uid, synonym in synonym_rows:
-            if synonym:
-                synonyms_by_uid.setdefault(uid, []).append(synonym)
+    uid_to_local_ids: dict[str, set[str]] = {}
+    for mapping, _, _ in result:
+        if mapping.uid:
+            uid_to_local_ids.setdefault(mapping.uid, set()).add(mapping.local_id)
 
-    for synonyms in synonyms_by_uid.values():
-        synonyms.sort()
+    uid_list = list(uid_to_local_ids.keys())
+    local_id_list = [mapping.local_id for mapping, _, _ in result]
+
+    synonyms_by_uid: dict[str, set[str]] = {uid: set() for uid in uid_list}
+    synonym_to_parent_uids: dict[str, set[str]] = {}
+
+    filters = []
+    if uid_list:
+        filters.append(Synonym.uid.in_(uid_list))
+    if local_id_list:
+        filters.append(Synonym.synonym.in_(local_id_list))
+
+    synonym_rows = []
+    if filters:
+        synonym_rows = db.session.execute(select(Synonym.uid, Synonym.synonym).where(or_(*filters))).all()
+
+    parent_uids = set()
+    for uid, synonym in synonym_rows:
+        if not synonym:
+            continue
+        synonyms_by_uid.setdefault(uid, set()).add(synonym)
+        synonym_to_parent_uids.setdefault(synonym, set()).add(uid)
+        parent_uids.add(uid)
+
+    missing_parent_uids = parent_uids - uid_to_local_ids.keys()
+    if missing_parent_uids:
+        parent_mappings = db.session.execute(
+            select(Mapping.uid, Mapping.local_id).where(Mapping.uid.in_(missing_parent_uids))
+        ).all()
+        for uid, local_id in parent_mappings:
+            uid_to_local_ids.setdefault(uid, set()).add(local_id)
 
     mappings = [
         {
@@ -186,7 +210,23 @@ def index():
             "source_db_name": source_db_name,
             "entity_type_name": entity_type_name,
             "updated_at_display": _format_updated_at(mapping.updated_at),
-            "synonyms": synonyms_by_uid.get(mapping.uid, []),
+            "synonyms": sorted(
+                {
+                    *synonyms_by_uid.get(mapping.uid, set()),
+                    *uid_to_local_ids.get(mapping.uid, set()),
+                    *(
+                        {
+                            alt
+                            for parent_uid in synonym_to_parent_uids.get(mapping.local_id, set())
+                            for alt in (
+                                uid_to_local_ids.get(parent_uid, set())
+                                | synonyms_by_uid.get(parent_uid, set())
+                            )
+                        }
+                    ),
+                }
+                - {mapping.local_id}
+            ),
         }
         for mapping, source_db_name, entity_type_name in result
     ]

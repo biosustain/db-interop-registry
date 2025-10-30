@@ -1,3 +1,5 @@
+from sqlalchemy import or_
+
 from backend.interop.models import Entity, Mapping, Registry, SourceDb, Synonym
 from backend.interop.services.interop import InteropService
 from backend.interop.utils.exceptions import DatabaseInconsistencyError, InvalidResourceTypeError, ResourceNotFoundError
@@ -34,26 +36,55 @@ class RegistryService:
         mapping_entry = self._resolve_mapping(local_id_or_uid, entity_type_id, resource)
         local_id = mapping_entry.local_id
 
-        synonym_rows = (
-            self.db.session.query(Synonym.synonym)
-            .filter(Synonym.uid == mapping_entry.uid)
-            .all()
-        )
-        alternate_local_ids = [synonym for (synonym,) in synonym_rows if synonym]
+        uid_group: set[str] = {mapping_entry.uid}
+        local_ids: set[str] = {local_id}
 
-        related_uids = set()
-        if alternate_local_ids:
+        changed = True
+        while changed:
+            changed = False
+
+            synonym_filters = []
+            if uid_group:
+                synonym_filters.append(Synonym.uid.in_(uid_group))
+            if local_ids:
+                synonym_filters.append(Synonym.synonym.in_(local_ids))
+
+            if synonym_filters:
+                synonym_rows = (
+                    self.db.session.query(Synonym.uid, Synonym.synonym)
+                    .filter(or_(*synonym_filters))
+                    .all()
+                )
+            else:
+                synonym_rows = []
+
+            for uid, synonym in synonym_rows:
+                if uid and uid not in uid_group:
+                    uid_group.add(uid)
+                    changed = True
+                if synonym and synonym not in local_ids:
+                    local_ids.add(synonym)
+                    changed = True
+
+            if not local_ids:
+                continue
+
             related_mappings = (
-                self.db.session.query(Mapping.uid)
+                self.db.session.query(Mapping.uid, Mapping.local_id)
                 .filter(
                     Mapping.entity_type_id == entity_type_id,
-                    Mapping.local_id.in_(alternate_local_ids),
+                    Mapping.local_id.in_(local_ids),
                 )
                 .all()
             )
-            related_uids.update(uid for (uid,) in related_mappings if uid)
 
-        uid_group = {mapping_entry.uid, *related_uids}
+            for uid, related_local_id in related_mappings:
+                if uid and uid not in uid_group:
+                    uid_group.add(uid)
+                    changed = True
+                if related_local_id and related_local_id not in local_ids:
+                    local_ids.add(related_local_id)
+                    changed = True
 
         # Get all rows from Mapping matching the UID group
         all_mappings = self.db.session.query(Mapping).filter(Mapping.uid.in_(uid_group)).all()
