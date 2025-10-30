@@ -49,6 +49,14 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['source_db_id'], ['source_db.id'], ),
     sa.PrimaryKeyConstraint('source_db_id', 'entity_type_id', 'local_id'),
     )
+    
+    op.create_table('synonyms',
+    sa.Column('uid', sa.String(length=255), nullable=False),
+    sa.Column('synonym', sa.String(length=255), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+    sa.PrimaryKeyConstraint('uid', 'synonym')
+    )
+    op.create_index(op.f('ix_synonyms_uid'), 'synonyms', ['uid'], unique=False)
 
     # Seed Entity (1: gene, 2: strain)
     op.execute("""
@@ -75,6 +83,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DELETE FROM source_db WHERE id IN (1,2,3,4);")
     op.execute("DELETE FROM entity WHERE id IN (1,2);")
+    op.drop_index(op.f('ix_synonyms_uid'), table_name='synonyms')
+    op.drop_table('synonyms')
     op.drop_table('mapping')
     op.drop_table('registry')
     op.drop_index(op.f('ix_source_db_id'), table_name='source_db')
