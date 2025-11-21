@@ -118,11 +118,11 @@ def test_make_request_posts_expected_payload(monkeypatch):
 
     monkeypatch.setattr(httpx, "Client", lambda *args, **kwargs: DummyClient(*args, **kwargs))
 
-    result = InteropService._make_request("http://example.com/resource", "L-55")
+    result = InteropService._make_request("localhost/resource", "L-55")
 
     assert result == {"status": "ok"}
     assert calls["client_kwargs"] == {"timeout": 120}
-    assert calls["post"]["url"] == "http://example.com/resource"
+    assert calls["post"]["url"] == "localhost/resource"
     assert calls["post"]["json"] == {"ids": ["L-55"]}
     assert calls["post"]["headers"] == {"Accept": "application/json"}
     assert calls["raise_called"] is True
@@ -155,7 +155,7 @@ def test_make_pair_request_posts_pair_payload(monkeypatch):
 
     monkeypatch.setattr(httpx, "Client", lambda *args, **kwargs: DummyClient(*args, **kwargs))
 
-    result = InteropService._make_pair_request("http://example.com/pairs", "G-1", "S-2")
+    result = InteropService._make_pair_request("localhost/pair", "G-1", "S-2")
 
     assert result == {"status": "pair-ok"}
     assert calls["client_kwargs"] == {"timeout": 120}

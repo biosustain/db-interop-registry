@@ -7,7 +7,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2021-12-01-previ
   location: location
   tags: tags
   properties: any({
-    retentionInDays: 7
+    retentionInDays: 30
     features: {
       searchVersion: 1
     }
