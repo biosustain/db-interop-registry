@@ -10,9 +10,10 @@ from pathlib import Path
 from sqlalchemy import tuple_
 from utils.db_connector import get_session
 from utils.models import Entity, Mapping, Registry, SourceDb, Synonym
+from utils.ncbi_assemblies import fetch_ncbi_assemblies, fetch_ncbi_gene_synonyms
+from utils.uniprot import fetch_uniprot_id
 
 BATCH_SIZE = 5_000
-
 
 def validate_entity_type(entity_type: str) -> str:
     """
@@ -127,22 +128,74 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     prepared = []
     failures = 0
 
+    def _merge_synonym_values(existing, fetched):
+        if not fetched:
+            return existing
+        if existing is None:
+            return fetched
+        if isinstance(existing, list):
+            return existing + fetched
+        return [existing, *fetched]
+
+    def _fetch_external_synonyms(
+        *,
+        has_gene_lookup: bool,
+        source_db_name: str,
+        entity_type: str,
+        local_id: str,
+        strain_id: str | None,
+    ) -> list[str]:
+        if has_gene_lookup and strain_id is not None:
+            ncbi_results = fetch_ncbi_gene_synonyms(local_id, strain_id)
+            if ncbi_results:
+                return list(ncbi_results)
+                
+            uniprot_results = fetch_uniprot_id(local_id, strain_id)
+            if uniprot_results:
+                return list(uniprot_results)
+
+        source_db_normalized = source_db_name.lower()
+        should_fetch_assemblies = entity_type == "strain" and source_db_normalized == "alebd"
+        if should_fetch_assemblies:
+            return list(fetch_ncbi_assemblies(local_id))
+        return []
+
     for idx, entity in batch:
         try:
-            required_fields = ["source_db", "entity_type", "local_id"]
+            has_gene_lookup = "gene_id" in entity and "strain_id" in entity
+            if has_gene_lookup:
+                required_fields = ["source_db", "gene_id", "strain_id"]
+            else:
+                required_fields = ["source_db", "entity_type", "local_id"]
             for field in required_fields:
                 if field not in entity:
                     raise ValueError(f"Missing required field: {field}")
 
             source_db_name = entity["source_db"]
-            entity_type = validate_entity_type(entity["entity_type"])
-            local_id = entity["local_id"]
+            if has_gene_lookup:
+                entity_type = validate_entity_type("gene")
+                local_id = str(entity["gene_id"])
+                strain_id = str(entity["strain_id"])
+            else:
+                entity_type = validate_entity_type(entity["entity_type"])
+                local_id = entity["local_id"]
+                strain_id = None
 
             source_db_id = get_source_db_id(session, source_db_name, cache=source_db_cache)
             entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
             uid = generate_uid(entity_type, local_id)
 
             raw_synonyms = entity.get("synonyms", [])
+
+            fetched_synonyms = _fetch_external_synonyms(
+                has_gene_lookup=has_gene_lookup,
+                source_db_name=source_db_name,
+                entity_type=entity_type,
+                local_id=local_id,
+                strain_id=strain_id,
+            )
+            raw_synonyms = _merge_synonym_values(raw_synonyms, fetched_synonyms)
+
             if raw_synonyms is None:
                 synonyms: list[str] = []
             elif isinstance(raw_synonyms, str):

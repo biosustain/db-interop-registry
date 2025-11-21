@@ -84,9 +84,9 @@ def ingest_bulk_entities() -> dict[str, list[dict[str, str]]]:
     combined_entities = {
         "entities": (
             aleDBEntities.get("entities", [])
-            + pmkBaseEntities.get("entities", [])
-            + pankbEntities.get("entities", [])
-            + biggEntities.get("entities", [])
+             + pmkBaseEntities.get("entities", [])
+             + pankbEntities.get("entities", [])
+             + biggEntities.get("entities", [])
         )
     }
 

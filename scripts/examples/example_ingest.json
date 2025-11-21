@@ -35,6 +35,11 @@
       "source_db": "Bigg",
       "entity_type": "strain",
       "local_id": "511145"
+    },
+    {
+      "source_db": "ALEdb",
+      "gene_id": "rpoB",
+      "strain_id": "1590"
     }
   ]
 }
