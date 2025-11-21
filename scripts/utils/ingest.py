@@ -155,9 +155,12 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                 return list(uniprot_results)
 
         source_db_normalized = source_db_name.lower()
-        should_fetch_assemblies = entity_type == "strain" and source_db_normalized == "alebd"
+        should_fetch_assemblies = entity_type == "strain" and source_db_normalized == "aledb"
         if should_fetch_assemblies:
-            return list(fetch_ncbi_assemblies(local_id))
+            print(f"Fetching NCBI assemblies for strain {local_id}...")
+            ncbi_results = list(fetch_ncbi_assemblies(local_id))
+            print(f"Found {len(ncbi_results)} assemblies for strain {local_id}.")
+            return ncbi_results
         return []
 
     for idx, entity in batch:
@@ -186,7 +189,6 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             uid = generate_uid(entity_type, local_id)
 
             raw_synonyms = entity.get("synonyms", [])
-
             fetched_synonyms = _fetch_external_synonyms(
                 has_gene_lookup=has_gene_lookup,
                 source_db_name=source_db_name,
@@ -195,7 +197,6 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                 strain_id=strain_id,
             )
             raw_synonyms = _merge_synonym_values(raw_synonyms, fetched_synonyms)
-
             if raw_synonyms is None:
                 synonyms: list[str] = []
             elif isinstance(raw_synonyms, str):

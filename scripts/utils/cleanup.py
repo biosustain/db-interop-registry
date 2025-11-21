@@ -10,7 +10,7 @@ import json
 import sys
 
 from utils.db_connector import get_session
-from utils.models import Entity, Mapping, Registry, SourceDb
+from utils.models import Entity, Mapping, Registry, SourceDb, Synonym
 
 
 def cleanup_all_data() -> None:
@@ -32,14 +32,20 @@ def cleanup_all_data() -> None:
         # Count existing records for reporting
         mapping_count = session.query(Mapping).count()
         registry_count = session.query(Registry).count()
+        synonym_count = session.query(Synonym).count()
 
-        print(f"Found {mapping_count} mapping entries and {registry_count} registry entries")
+        print(f"Found {mapping_count} mapping, {registry_count} registry, and {synonym_count} synonyms")
 
         if mapping_count == 0 and registry_count == 0:
             print("Database is already empty - nothing to clean up")
             return
 
-        # Delete all mappings first (due to foreign key constraints)
+        # Delete all synonyms
+        print("Deleting all synonym entries...")
+        deleted_synonyms = session.query(Synonym).delete()
+
+
+        # Delete all mappings
         print("Deleting all mapping entries...")
         deleted_mappings = session.query(Mapping).delete()
 
@@ -51,6 +57,7 @@ def cleanup_all_data() -> None:
         session.commit()
 
         print("\nComplete cleanup finished!")
+        print(f"   Deleted {deleted_synonyms} synonym entries")
         print(f"   Deleted {deleted_mappings} mapping entries")
         print(f"   Deleted {deleted_registry} registry entries")
         print("   Database is now clean and ready for fresh data")
