@@ -9,7 +9,7 @@ from pathlib import Path
 
 from sqlalchemy import tuple_
 from utils.db_connector import get_session
-from utils.models import Entity, Mapping, Registry, SourceDb, Synonym
+from utils.models import AuditLog, Entity, Mapping, Registry, SourceDb, Synonym
 from utils.ncbi_assemblies import fetch_ncbi_assemblies, fetch_ncbi_gene_synonyms
 from utils.uniprot import fetch_uniprot_id
 
@@ -261,6 +261,7 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     now = datetime.datetime.utcnow()
     new_registry_rows: list[dict] = []
     new_mapping_rows: list[dict] = []
+    new_audit_rows: list[dict] = []
     mapping_updates: list[dict] = []
 
     for key, payload in unique_payloads.items():
@@ -295,11 +296,19 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                     "updated_at": now,
                 }
             )
+            new_audit_rows.append(
+                {
+                    "uid": payload["uid"],
+                    "event_type": "Ingest",
+                }
+            )
 
     if new_registry_rows:
         session.bulk_insert_mappings(Registry, new_registry_rows)
     if new_mapping_rows:
         session.bulk_insert_mappings(Mapping, new_mapping_rows)
+    if new_audit_rows:
+        session.bulk_insert_mappings(AuditLog, new_audit_rows)
     if mapping_updates:
         session.bulk_update_mappings(Mapping, mapping_updates)
 

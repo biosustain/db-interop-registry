@@ -10,7 +10,7 @@ import json
 import sys
 
 from utils.db_connector import get_session
-from utils.models import Entity, Mapping, Registry, SourceDb, Synonym
+from utils.models import AuditLog, Entity, Mapping, Registry, SourceDb, Synonym
 
 
 def cleanup_all_data() -> None:
@@ -159,6 +159,8 @@ def cleanup_entities(file_path: str) -> None:
                     print("   Deleted from registry table")
                 else:
                     print("   No corresponding registry entry found (orphaned mapping)")
+
+                session.add(AuditLog(uid=uid, event_type="Removed"))
 
                 # Commit this deletion
                 session.commit()

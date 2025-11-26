@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -50,3 +50,12 @@ class Registry(db.Model):
     source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
     entity_type_id: Mapped[int] = mapped_column(ForeignKey("entity.id", ondelete="CASCADE"), primary_key=True)
     local_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_log"
+
+    event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now())
+    uid: Mapped[str] = mapped_column(String(255))
+    event_type: Mapped[str] = mapped_column(String(255))
