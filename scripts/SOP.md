@@ -39,7 +39,7 @@ Notes:
 - Batch size defaults to 5,000; adjust `BATCH_SIZE` in `scripts/utils/ingest.py` only after validating memory and DB load impact.
 - Audit trail: new mappings create `audit_log` entries with `event_type` `Ingest` (`event_id`, `event_time`, `uid`, `event_type` columns).
 
-## Bulk ingest from partner APIs
+## Bulk ingest from APIs
 Use when syncing publicly exposed partner datasets.
 1) Confirm outbound access to:
    - `https://aledb.org/interop-query/strains` and `/genes`
