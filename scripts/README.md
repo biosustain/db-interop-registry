@@ -36,6 +36,58 @@ Utilities in `scripts/` manage registry ingestion, bulk partner syncs, and clean
 - Data hygiene in bulk mode: gene IDs are trimmed at whitespace, stripped of non-word characters except hyphen, and lower/upper casing is preserved from the source.
 - Transactions and batching: ingest commits per batch (default 5,000 rows); cleanup commits per UID. Failures roll back the in-flight batch/UID and continue.
 
+## Data model
+
+```mermaid
+erDiagram
+    ENTITY {
+        int id PK
+        string name
+    }
+    SOURCE_DB {
+        int id PK
+        string db_name
+    }
+    REGISTRY {
+        int source_db_id PK
+        int entity_type_id PK
+        string local_id PK
+    }
+    MAPPING {
+        int source_db_id PK
+        int entity_type_id PK
+        string local_id PK
+        string uid
+        datetime updated_at
+    }
+    SYNONYMS {
+        string uid PK
+        string synonym PK
+        datetime created_at
+    }
+    AUDIT_LOG {
+        int event_id PK
+        datetime event_time
+        string uid
+        string event_type
+    }
+
+    SOURCE_DB ||--o{ REGISTRY : contains
+    ENTITY ||--o{ REGISTRY : typed
+    REGISTRY ||--o{ MAPPING : resolves
+    SOURCE_DB ||--o{ MAPPING : maps
+    ENTITY ||--o{ MAPPING : typed
+    MAPPING ||--o{ SYNONYMS : has
+    MAPPING ||--o{ AUDIT_LOG : events
+```
+
+- `entity`: canonical resource types (`gene`, `strain`).
+- `source_db`: partner datasets (BiGG, ALEdb, PMKbase, Pankb, etc.).
+- `registry`: composite key of source DB, entity type, and local ID.
+- `mapping`: adds a UID and timestamp to a registry entry; composite PK matches `registry`.
+- `synonyms`: alternate identifiers keyed by UID; no enforced FK but stored against mapping UIDs.
+- `audit_log`: append-only events; ingest writes `Ingest`, cleanup writes `Removed`, keyed by UID (no FK).
+
 ## Safety notes
 - `--cleanup-all` wipes `Synonym`, `Mapping`, and `Registry`; use only for environment resets.
 - `--list` performs an unpaged full scan; avoid on large datasets.
