@@ -2,6 +2,11 @@
   "entities": [
     {
       "source_db": "ALEdb",
+      "entity_type": "strain",
+      "local_id": "1415167"
+    },
+    {
+      "source_db": "ALEdb",
       "entity_type": "gene",
       "local_id": "rpoB",
       "synonyms": ["rpoB_9", "rpoB_4"]

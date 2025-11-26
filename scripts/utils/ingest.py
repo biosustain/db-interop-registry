@@ -147,12 +147,9 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     ) -> list[str]:
         if has_gene_lookup and strain_id is not None:
             ncbi_results = fetch_ncbi_gene_synonyms(local_id, strain_id)
-            if ncbi_results:
-                return list(ncbi_results)
-                
             uniprot_results = fetch_uniprot_id(local_id, strain_id)
-            if uniprot_results:
-                return list(uniprot_results)
+
+            return list(ncbi_results) + list(uniprot_results)
 
         source_db_normalized = source_db_name.lower()
         should_fetch_assemblies = entity_type == "strain" and source_db_normalized == "aledb"
