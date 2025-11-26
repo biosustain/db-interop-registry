@@ -40,3 +40,9 @@
   Retrieves the combined interoperability payload for a specific gene/strain pair.
 - `GET /`  
   Renders the HTML dashboard summarizing recent mappings and search results.
+
+## Backend Docs (Sphinx/Read the Docs style)
+Generate and view the auto-documented backend API reference:
+- Install dev deps (includes Sphinx): `pip install -r requirements-dev.txt`
+- Build HTML docs: `make -C docs html`
+- Open `docs/_build/html/index.html` in a browser to view

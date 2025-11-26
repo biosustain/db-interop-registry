@@ -1,5 +1,6 @@
 from datetime import UTC
 
+from flasgger import swag_from
 from flask import jsonify, render_template, request
 from sqlalchemy import or_, select
 
@@ -11,48 +12,45 @@ from backend.interop.services.registry import RegistryService
 
 
 @bp.route("/<resource>/<string:local_id_or_uid>", methods=["GET"])
+@swag_from(
+    {
+        "tags": ["Registry"],
+        "parameters": [
+            {
+                "in": "path",
+                "name": "resource",
+                "required": True,
+                "schema": {"type": "string", "enum": ["gene", "strain"]},
+                "description": "Type of resource to fetch.",
+            },
+            {
+                "in": "path",
+                "name": "local_id_or_uid",
+                "required": True,
+                "schema": {"type": "string"},
+                "description": "Local identifier or UID of the resource.",
+            },
+        ],
+        "responses": {
+            200: {
+                "description": "Registry item located.",
+                "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}},
+            },
+            400: {
+                "description": "Invalid resource type supplied.",
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object", "properties": {"error": {"type": "string"}}}
+                    }
+                },
+            },
+            404: {"description": "Registry item not found."},
+            500: {"description": "Unexpected server error."},
+        },
+    }
+)
 def get_registry_item(resource, local_id_or_uid):
-    """
-    Retrieve a registry item by resource type and identifier.
-    ---
-    tags:
-      - Registry
-    parameters:
-      - in: path
-        name: resource
-        required: true
-        schema:
-          type: string
-          enum: ["gene", "strain"]
-        description: Type of resource to fetch.
-      - in: path
-        name: local_id_or_uid
-        required: true
-        schema:
-          type: string
-        description: Local identifier or UID of the resource.
-    responses:
-      200:
-        description: Registry item located.
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      400:
-        description: Invalid resource type supplied.
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                error:
-                  type: string
-      404:
-        description: Registry item not found.
-      500:
-        description: Unexpected server error.
-    """
+    """Retrieve a registry item by resource type and identifier."""
     # Validate resource type
     try:
         resource_type = ResourceType(resource)
@@ -66,31 +64,30 @@ def get_registry_item(resource, local_id_or_uid):
 
 
 @bp.route("/pair/<path:pair_identifiers>", methods=["GET"])
+@swag_from(
+    {
+        "tags": ["Registry"],
+        "parameters": [
+            {
+                "in": "path",
+                "name": "pair_identifiers",
+                "required": True,
+                "schema": {"type": "string"},
+                "description": "Comma-separated identifiers, e.g. thrL,GCF_000005845.2.",
+            }
+        ],
+        "responses": {
+            200: {
+                "description": "Pair interop payload.",
+                "content": {"application/json": {"schema": {"type": "object"}}},
+            },
+            400: {"description": "Invalid pair identifier supplied."},
+            500: {"description": "Unexpected server error."},
+        },
+    }
+)
 def get_registry_pair(pair_identifiers: str):
-    """
-    Retrieve registry information for a gene/strain pair.
-    ---
-    tags:
-      - Registry
-    parameters:
-      - in: path
-        name: pair_identifiers
-        required: true
-        schema:
-          type: string
-        description: Comma-separated identifiers, e.g. thrL,GCF_000005845.2.
-    responses:
-      200:
-        description: Pair interop payload.
-        content:
-          application/json:
-            schema:
-              type: object
-      400:
-        description: Invalid pair identifier supplied.
-      500:
-        description: Unexpected server error.
-    """
+    """Retrieve registry information for a gene/strain pair."""
     try:
         gene_id, strain_id = [segment.strip() for segment in pair_identifiers.split(",", 1)]
     except ValueError:
@@ -105,27 +102,28 @@ def get_registry_pair(pair_identifiers: str):
 
 
 @bp.route("/", methods=["GET"])
+@swag_from(
+    {
+        "tags": ["Registry"],
+        "parameters": [
+            {
+                "in": "query",
+                "name": "q",
+                "schema": {"type": "string"},
+                "required": False,
+                "description": "Search term applied to UID or local ID.",
+            }
+        ],
+        "responses": {
+            200: {
+                "description": "HTML page containing registry mappings.",
+                "content": {"text/html": {"schema": {"type": "string"}}},
+            }
+        },
+    }
+)
 def index():
-    """
-    Render the HTML view of available mappings.
-    ---
-    tags:
-      - Registry
-    parameters:
-      - in: query
-        name: q
-        schema:
-          type: string
-        required: false
-        description: Search term applied to UID or local ID.
-    responses:
-      200:
-        description: HTML page containing registry mappings.
-        content:
-          text/html:
-            schema:
-              type: string
-    """
+    """Render the HTML view of available mappings."""
     search_query = request.args.get("q", "").strip()
     total_count = db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
     entity_counts_result = db.session.execute(

@@ -6,3 +6,5 @@ coverage
 pytest-cov
 pytest-dotenv
 pre-commit
+sphinx
+sphinx-rtd-theme
