@@ -46,3 +46,10 @@ Generate and view the auto-documented backend API reference:
 - Install dev deps (includes Sphinx): `pip install -r requirements-dev.txt`
 - Build HTML docs: `make -C docs html`
 - Open `docs/_build/html/index.html` in a browser to view
+
+## Azure Deployment (azd)
+- Log in: `azd login`
+- Deploy: `azd up`
+- When prompted, select resource group `rg-recon-dbinterop`.
+- The terminal shows a deployment status link; follow it to track success/failure.
+- After code changes, rerun `azd up` to redeploy.
