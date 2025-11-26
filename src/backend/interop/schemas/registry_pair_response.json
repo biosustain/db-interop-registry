@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RegistryPairResponse",
+  "type": "object",
+  "properties": {
+    "gene": { "type": "string" },
+    "strain": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": { "type": "string" },
+          "data": { "type": "object" }
+        },
+        "required": ["source", "data"]
+      }
+    }
+  },
+  "required": ["gene", "strain", "sources"]
+}

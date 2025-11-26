@@ -1,4 +1,6 @@
+import json
 from datetime import UTC
+from pathlib import Path
 
 from flasgger import swag_from
 from flask import jsonify, render_template, request
@@ -9,6 +11,10 @@ from backend.interop import bp
 from backend.interop.enums import ResourceType
 from backend.interop.models import Entity, Mapping, SourceDb, Synonym
 from backend.interop.services.registry import RegistryService
+
+SCHEMAS_DIR = Path(__file__).resolve().parent / "schemas"
+REGISTRY_ITEM_SCHEMA = json.loads((SCHEMAS_DIR / "registry_item_response.json").read_text())
+REGISTRY_PAIR_SCHEMA = json.loads((SCHEMAS_DIR / "registry_pair_response.json").read_text())
 
 
 @bp.route("/<resource>/<string:local_id_or_uid>", methods=["GET"])
@@ -34,7 +40,11 @@ from backend.interop.services.registry import RegistryService
         "responses": {
             200: {
                 "description": "Registry item located.",
-                "content": {"application/json": {"schema": {"type": "object", "additionalProperties": True}}},
+                "content": {
+                    "application/json": {
+                        "schema": REGISTRY_ITEM_SCHEMA
+                    }
+                },
             },
             400: {
                 "description": "Invalid resource type supplied.",
@@ -79,7 +89,11 @@ def get_registry_item(resource, local_id_or_uid):
         "responses": {
             200: {
                 "description": "Pair interop payload.",
-                "content": {"application/json": {"schema": {"type": "object"}}},
+                "content": {
+                    "application/json": {
+                        "schema": REGISTRY_PAIR_SCHEMA
+                    }
+                },
             },
             400: {"description": "Invalid pair identifier supplied."},
             500: {"description": "Unexpected server error."},

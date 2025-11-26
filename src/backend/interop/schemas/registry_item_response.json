@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RegistryItemResponse",
+  "type": "object",
+  "properties": {
+    "local_id": { "type": "string" },
+    "uid": { "type": "string" },
+    "entity_type": { "type": "string", "enum": ["gene", "strain"] },
+    "attributes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_db": { "type": "string" },
+          "local_id": { "type": "string" },
+          "data": { "type": "object" }
+        },
+        "required": ["source_db", "local_id", "data"]
+      }
+    }
+  },
+  "required": ["local_id", "uid", "entity_type", "attributes"]
+}
