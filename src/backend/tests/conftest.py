@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import MetaData, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from backend import create_app
@@ -26,9 +27,36 @@ def db(app, request):
     """Session-wide test database."""
 
     def teardown():
-        _db.drop_all()
+        # Drop using reflected metadata to honor real FK dependencies.
+        engine = _db.engine
+        with engine.begin() as conn:
+            meta = MetaData()
+            meta.reflect(bind=conn)
+            try:
+                if meta.tables:
+                    meta.drop_all(bind=conn)
+                else:
+                    # Fallback: reset schema if nothing reflected (defensive)
+                    conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+                    conn.execute(text("CREATE SCHEMA public"))
+            except Exception:
+                # Last-resort fallback to ensure clean teardown
+                conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+                conn.execute(text("CREATE SCHEMA public"))
 
     _db.app = app
+    # Ensure a clean schema before creating tables for tests
+    engine = _db.engine
+    with engine.begin() as conn:
+        meta = MetaData()
+        meta.reflect(bind=conn)
+        if meta.tables:
+            meta.drop_all(bind=conn)
+        else:
+            # Reset schema if nothing reflected (handles prior failed runs)
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+
     _db.create_all()
 
     request.addfinalizer(teardown)
