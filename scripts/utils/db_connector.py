@@ -55,11 +55,15 @@ def get_local_session():
     username = os.getenv("LOCAL_DB_USERNAME", "app_user")
     password = os.getenv("LOCAL_DB_PASSWORD", "app_password")
 
-    connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
+    # Add a short connect timeout to fail fast if DB is unreachable
+    connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}?connect_timeout=5"
     print(connection_string)
     logger.info(f"Connecting to local PostgreSQL: {host}:{port}/{database}")
 
-    engine = create_engine(connection_string)
+    # pre_ping guards against stale connections; force an initial connect to surface errors early
+    engine = create_engine(connection_string, pool_pre_ping=True)
+    with engine.connect() as _:
+        pass
     Session = sessionmaker(bind=engine)
 
     return Session()

@@ -12,6 +12,8 @@ from utils.cleanup import cleanup_all_data, cleanup_entities
 from utils.ingest import ingest_entities
 from utils.ingest_bulk import ingest_bulk_entities
 from utils.list import list_registry
+from utils.db_connector import get_session
+from utils.models import BaseModel, Entity, SourceDb
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,6 +54,30 @@ def list_all() -> None:
     pass
 
 
+def init_db() -> None:
+    """Initialize database schema and seed lookup tables."""
+    session = get_session()
+    engine = session.get_bind()
+
+    # Create tables if they don't exist
+    BaseModel.metadata.create_all(bind=engine)
+
+    # Seed entities (idempotent)
+    required_entities = ["gene", "strain"]
+    for name in required_entities:
+        if not session.query(Entity).filter(Entity.name == name).first():
+            session.add(Entity(name=name))
+
+    # Seed common source DBs (idempotent)
+    required_sources = ["Bigg", "ALEdb", "PMKbase", "Pankb"]
+    for db_name in required_sources:
+        if not session.query(SourceDb).filter(SourceDb.db_name == db_name).first():
+            session.add(SourceDb(db_name=db_name))
+
+    session.commit()
+    logger.info("Initialized DB schema and seeded lookup tables")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Interop database utilities")
 
@@ -62,6 +88,7 @@ def main():
     group.add_argument("--cleanup-all", action="store_true", help="Cleanup all entities")
     group.add_argument("--list", action="store_true", help="List all entities")
     group.add_argument("--ingest-bulk", action="store_true", help="Ingest entities from internal databases")
+    group.add_argument("--init-db", action="store_true", help="Create tables and seed lookup data")
 
     args = parser.parse_args()
 
@@ -77,6 +104,8 @@ def main():
         cleanup()
     elif args.list:
         list_all()
+    elif args.init_db:
+        init_db()
 
     return 0
 

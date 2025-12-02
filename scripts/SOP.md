@@ -18,6 +18,17 @@ This SOP covers repeatable operations for loading, inspecting, and cleaning regi
   - Ingest JSON shaped like `scripts/examples/example_ingest.json`.
   - Cleanup JSON shaped like `scripts/examples/example_cleanup.json`.
 
+## Initialize database schema
+Use when starting from an empty database or after destructive test runs.
+1) From `scripts/`, run:
+   ```bash
+   python interop_utils.py --init-db
+   ```
+2) This creates all required tables and seeds lookup values:
+   - `entity`: `gene`, `strain`
+   - `source_db`: `Bigg`, `ALEdb`, `PMKbase`, `Pankb`
+3) The command is idempotent; running it multiple times is safe.
+
 ## Ingest from file
 Use when ingesting payloads:
 1) Validate input file:

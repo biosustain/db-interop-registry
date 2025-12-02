@@ -33,6 +33,13 @@
   ```
   The `--list` flag prints the current registry contents. `--ingest-bulk` ingests all gene and strain entities using the configuration defined in `scripts/.env`.
 
+### Initialize the database schema
+- If your tables were dropped or you are starting fresh, you can (re)create the schema and seed lookup rows with:
+  ```bash
+  python scripts/interop_utils.py --init-db
+  ```
+  This command creates all tables and seeds the `entity` table (`gene`, `strain`) and the `source_db` table (`Bigg`, `ALEdb`, `PMKbase`, `Pankb`). It is idempotent and safe to run multiple times.
+
 ## REST API
 - `GET /<resource>/<local_id_or_uid>`  
   Returns the registry entry for a gene or strain using either its local identifier or UID. Valid resources are `gene` and `strain`.
