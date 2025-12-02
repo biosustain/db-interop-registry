@@ -1,8 +1,12 @@
 {
   "uids": [
-    "G-6EE9A9CD",
     "G-118BAC66",
     "G-12455",
-    "S-74A7A428"
+    "S-74A7A428",
+    "S-95516EDB"
+  ],
+  "synonyms": [
+    { "uid": "G-6EE9A9CD", "synonym": "rpoB_9" },
+    { "uid": "G-6EE9A9CD", "synonym": "Q88XZ3" }
   ]
 }

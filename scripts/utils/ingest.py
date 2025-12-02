@@ -262,6 +262,7 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
     new_registry_rows: list[dict] = []
     new_mapping_rows: list[dict] = []
     new_audit_rows: list[dict] = []
+    new_synonym_audit_rows: list[dict] = []
     mapping_updates: list[dict] = []
 
     for key, payload in unique_payloads.items():
@@ -329,9 +330,17 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             if key not in existing_synonyms:
                 existing_synonyms.add(key)
                 new_synonym_rows.append({"uid": uid, "synonym": synonym})
+                new_synonym_audit_rows.append(
+                    {
+                        "uid": uid,
+                        "event_type": "Added synonym " + synonym,
+                    }
+                )
 
     if new_synonym_rows:
         session.bulk_insert_mappings(Synonym, new_synonym_rows)
+    if new_synonym_audit_rows:
+        session.bulk_insert_mappings(AuditLog, new_synonym_audit_rows)
 
     return len(prepared), failures
 

@@ -85,7 +85,39 @@ Use only for environment resets.
 - Logging:
   - Console messages capture batch progress and start/end timestamps.
   - DB transactions: commit per batch (ingest) or per UID (cleanup); any exception triggers rollback before exit.
-  - Audit records: `audit_log` accumulates `Ingest` and `Removed` events keyed by `uid`.
+- Audit records: `audit_log` accumulates `Ingest` and `Removed` events keyed by `uid`.
+
+## UID merge and split procedures
+
+Purpose
+- Use synonyms to connect (merge) or disconnect (split) UIDs without rewriting mapping rows. UIDs remain deterministic per `(entity_type, local_id)`; synonyms define equivalence edges used by downstream consumers.
+
+Merge UIDs (connect)
+1) Identify UIDs to connect (e.g., `G-A...` and `G-B...`).
+2) Choose a shared synonym strategy:
+   - Add an existing synonym from UID B onto UID A, or
+   - Add UID B’s string (e.g., `G-B...`) as a synonym of UID A, or
+   - Add a brand-new common synonym to both A and B.
+3) Prepare an ingest file that targets the UID you’re updating by providing the same `source_db`/`entity_type`/`local_id` that yields that UID, plus the synonym(s):
+   ```json
+   { "entities": [ { "source_db": "ALEdb", "entity_type": "gene", "local_id": "rpoB", "synonyms": ["G-BXXXXXX", "rpoB_alt"] } ] }
+   ```
+4) Run: `python interop_utils.py --ingest <file>.json`.
+5) Post-check: query `synonyms` for both UIDs and confirm at least one identical string is present under each.
+
+Split UIDs (disconnect)
+1) Identify the shared synonym(s) creating the undesired connection.
+2) Prepare a cleanup file using the `synonyms` key to remove only those pairs, not the entire UID:
+   ```json
+   { "synonyms": [ ["G-Axxxxxx", "shared_syn"], {"uid": "G-Bxxxxxx", "synonym": "shared_syn"} ] }
+   ```
+   Accepted shapes: list of pairs, list of objects with `uid`+`synonym`/`synonyms`, or a map `{ "UID": ["syn1", ...] }`.
+3) Run: `python interop_utils.py --cleanup <file>.json`.
+4) Post-check: ensure the removed synonyms no longer appear under the affected UIDs.
+
+Auditing
+- Merge: new synonym inserts log `Added synonym <value>` for the affected UID(s); if a synonym already exists, no duplicate is inserted or logged.
+- Split: synonym-only deletions log `Removed synonym <value>` for each removed pair; full UID deletions log `Removed`.
 
 ## Operational guardrails
 - Do not run ingest or cleanup without a filled `.env`; the connector will raise and exit.
