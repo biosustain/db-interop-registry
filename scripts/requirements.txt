@@ -1,5 +1,5 @@
 # Azure PostgreSQL Connection Script Requirements
-psycopg2==2.9.10
+psycopg2==2.9.11
 azure-identity==1.25.0
 azure-keyvault-secrets==4.10.0
 SQLAlchemy==2.0.43
