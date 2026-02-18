@@ -173,7 +173,7 @@ def ingest_bulk_relationships():
         ("https://pankb.org/", "Pankb"),
         # Add more databases here as they implement the gene-strain-pairs endpoint
         # ("https://aledb.org", "ALEdb"),
-        # ("http://biggr-prod.northeurope.cloudapp.azure.com/", "Bigg"),
+        # ("https://biggr.org/", "Bigg"),
     ]
 
     total_success = 0

@@ -206,7 +206,7 @@ def ingest_bulk_entities() -> None:
         {"url": "https://aledb.org", "name": "ALEdb", "genes": True, "pairs": False},
         {"url": "https://www.pmkbase.com", "name": "PMKbase", "genes": False, "pairs": False},
         {"url": "https://pankb.org", "name": "PanKB", "genes": True, "pairs": True},
-        {"url": "http://biggr-prod.northeurope.cloudapp.azure.com", "name": "Bigg", "genes": True, "pairs": False},
+        {"url": "https://biggr.org", "name": "Bigg", "genes": True, "pairs": False},
     ]
 
     # for source in sources:
