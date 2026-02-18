@@ -37,7 +37,7 @@ Utilities in `scripts/` manage registry ingestion, bulk partner syncs, and clean
 - Bulk ingest sources:
   - ALEdb strains and genes: `https://aledb.org/interop-query`
   - PMKbase strains (genes disabled): `https://www.pmkbase.com/interop-query`
-  - Pankb strains and genes: `http://pankb-preprod.northeurope.cloudapp.azure.com/interop-query`
+  - Pankb strains and genes: `https://pankb.org/interop-query`
   - BiGG strains and genes: `http://biggr-prod.northeurope.cloudapp.azure.com/interop-query`
 - Data hygiene in bulk mode: gene IDs are trimmed at whitespace, stripped of non-word characters except hyphen, and lower/upper casing is preserved from the source.
 - Transactions and batching: ingest commits per batch (default 5,000 rows); cleanup commits per UID. Failures roll back the in-flight batch/UID and continue.

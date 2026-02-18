@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Mapping List{% endblock %}
+{% block title %}Registry{% endblock %}
 {% block head %}
     {{ super() }}
     <style>
@@ -26,33 +26,66 @@
                 left: 1rem;
             }
         }
+
+        .nav-tabs .nav-link {
+            color: #495057;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: 600;
+        }
+        .url-link {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
     </style>
 {% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Registry Entities</h1>
+    <h1 class="mb-0">Registry</h1>
     <a class="btn btn-outline-danger" href="{{ url_for('flasgger.apidocs') }}" target="_blank" rel="noopener">
         View API Docs
     </a>
 </div>
 
-<form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
-    <div class="input-group">
-        <input
-            type="text"
-            name="q"
-            class="form-control"
-            placeholder="Search by UID or Local ID"
-            value="{{ search_query }}"
-            aria-label="Search mappings"
-        />
-        <button class="btn btn-primary" type="submit">Search</button>
-    </div>
-</form>
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs mb-3" id="registryTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {{ 'active' if active_tab == 'entities' else '' }}" id="entities-tab" data-bs-toggle="tab" data-bs-target="#entities-pane" type="button" role="tab" aria-controls="entities-pane" aria-selected="{{ 'true' if active_tab == 'entities' else 'false' }}">
+            Entities
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {{ 'active' if active_tab == 'relationships' else '' }}" id="relationships-tab" data-bs-toggle="tab" data-bs-target="#relationships-pane" type="button" role="tab" aria-controls="relationships-pane" aria-selected="{{ 'true' if active_tab == 'relationships' else 'false' }}">
+            Relationships
+        </button>
+    </li>
+</ul>
 
-<div class="position-relative">
-    <div id="mappings-column">
-        {% if mappings %}
+<!-- Tab Content -->
+<div class="tab-content" id="registryTabsContent">
+    <!-- Entities Tab -->
+    <div class="tab-pane fade {{ 'show active' if active_tab == 'entities' else '' }}" id="entities-pane" role="tabpanel" aria-labelledby="entities-tab">
+        <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
+            <input type="hidden" name="tab" value="entities">
+            <div class="input-group">
+                <input
+                    type="text"
+                    name="q"
+                    class="form-control"
+                    placeholder="Search by UID or Local ID"
+                    value="{{ search_query }}"
+                    aria-label="Search mappings"
+                />
+                <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+        </form>
+
+        <div class="position-relative">
+            <div id="mappings-column">
+                {% if mappings %}
 {% set total_display = total_count if total_count is not none else None %}
 {% set strain_display = '{:,}'.format(strain_count) if strain_count is not none else 'unknown' %}
 {% set gene_display = '{:,}'.format(gene_count) if gene_count is not none else 'unknown' %}
@@ -75,6 +108,7 @@
             <th>Synonyms</th>
             <th>Source Db</th>
             <th>Entity Type</th>
+            <th>URL</th>
             <th>Updated At</th>
         </tr>
     </thead>
@@ -117,6 +151,17 @@
             </td>
             <td>{{ item.source_db_name }}</td>
             <td>{{ item.entity_type_name }}</td>
+            <td>
+                {% if item.entity_urls %}
+                    {% for url in item.entity_urls %}
+                    <a href="{{ url }}" target="_blank" rel="noopener" class="url-link" title="{{ url }}">
+                        View{% if loop.length > 1 %} {{ loop.index }}{% endif %}
+                    </a>{% if not loop.last %} {% endif %}
+                    {% endfor %}
+                {% else %}
+                &mdash;
+                {% endif %}
+            </td>
             <td>{{ item.updated_at_display }}</td>
         </tr>
         {% endfor %}
@@ -125,16 +170,98 @@
         {% else %}
 <p>No mappings found{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.</p>
         {% endif %}
+            </div>
+        </div>
     </div>
-    <div id="detail-column" class="detail-overlay d-none">
-        <div id="detail-container" class="card shadow">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Details</span>
-                <button id="detail-close" type="button" class="btn btn-link text-danger p-0" aria-label="Close details">&times;</button>
+
+    <!-- Relationships Tab -->
+    <div class="tab-pane fade {{ 'show active' if active_tab == 'relationships' else '' }}" id="relationships-pane" role="tabpanel" aria-labelledby="relationships-tab">
+        <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
+            <input type="hidden" name="tab" value="relationships">
+            <div class="input-group">
+                <input
+                    type="text"
+                    name="q"
+                    class="form-control"
+                    placeholder="Search by Gene/Strain UID or Local ID"
+                    value="{{ rel_search_query }}"
+                    aria-label="Search relationships"
+                />
+                <button class="btn btn-primary" type="submit">Search</button>
             </div>
-            <div class="card-body">
-                <pre id="detail-output" class="mb-0">Select a mapping to preview JSON response.</pre>
-            </div>
+        </form>
+
+        {% if relationships %}
+        <p class="text-muted">
+            <span class="d-block mb-1">Total relationships: {{ '{:,}'.format(total_relationships) if total_relationships is not none else 'unknown' }}</span>
+            {% if rel_search_query %}
+            <span>Displaying results matching <strong>{{ rel_search_query }}</strong></span>
+            {% else %}
+            Displaying up to {{ rel_result_cap }} result{% if rel_result_cap != 1 %}s{% endif %}
+            {% endif %}
+        </p>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Gene UID</th>
+                    <th>Gene Local ID</th>
+                    <th>Strain UID</th>
+                    <th>Strain Local ID</th>
+                    <th>Source DB</th>
+                    <th>URL</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rel in relationships %}
+                <tr>
+                    <td class="text-start">
+                        <div class="btn-group" role="group">
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_pair', pair_identifiers=(rel.gene_local_id or rel.gene_uid) + ',' + (rel.strain_local_id or rel.strain_uid)) }}" target="_blank" rel="noopener">
+                                Query
+                            </a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview-pair" data-gene-id="{{ rel.gene_local_id or rel.gene_uid }}" data-strain-id="{{ rel.strain_local_id or rel.strain_uid }}">
+                                Preview
+                            </button>
+                        </div>
+                    </td>
+                    <td>{{ rel.gene_uid }}</td>
+                    <td>{{ rel.gene_local_id or '&mdash;' | safe }}</td>
+                    <td>{{ rel.strain_uid }}</td>
+                    <td>{{ rel.strain_local_id or '&mdash;' | safe }}</td>
+                    <td>{{ rel.source_db_name }}</td>
+                    <td>
+                        {% if rel.urls %}
+                            {% for url in rel.urls %}
+                            <a href="{{ url }}" target="_blank" rel="noopener" class="url-link" title="{{ url }}">
+                                View{% if loop.length > 1 %} {{ loop.index }}{% endif %}
+                            </a>{% if not loop.last %} {% endif %}
+                            {% endfor %}
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                    </td>
+                    <td>{{ rel.created_at_display }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No relationships found{% if rel_search_query %} for "<strong>{{ rel_search_query }}</strong>"{% endif %}.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Shared Detail Panel (outside tabs) -->
+<div id="detail-column" class="detail-overlay d-none">
+    <div id="detail-container" class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Details</span>
+            <button id="detail-close" type="button" class="btn btn-link text-danger p-0" aria-label="Close details">&times;</button>
+        </div>
+        <div class="card-body">
+            <pre id="detail-output" class="mb-0">Select a mapping to preview JSON response.</pre>
         </div>
     </div>
 </div>
@@ -173,11 +300,50 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    detailClose.addEventListener('click', () => {
-        detailContainer.classList.add('d-none');
-        detailColumn.classList.add('d-none');
-        detailOutput.textContent = 'Select a mapping to preview JSON response.';
+    // Preview for gene-strain pairs
+    document.querySelectorAll('button[data-action="preview-pair"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const geneId = button.dataset.geneId;
+            const strainId = button.dataset.strainId;
+
+            detailOutput.textContent = 'Loading...';
+            detailContainer.classList.remove('d-none');
+            detailColumn.classList.remove('d-none');
+
+            try {
+                const response = await fetch(`/pair/${encodeURIComponent(geneId)},${encodeURIComponent(strainId)}`);
+                if (!response.ok) {
+                    const text = await response.text();
+                    detailOutput.textContent = `Error ${response.status}: ${text}`;
+                    return;
+                }
+
+                const data = await response.json();
+                detailOutput.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                detailOutput.textContent = `Failed to fetch data: ${error}`;
+            }
+        });
     });
+
+    if (detailClose) {
+        detailClose.addEventListener('click', () => {
+            detailContainer.classList.add('d-none');
+            detailColumn.classList.add('d-none');
+            detailOutput.textContent = 'Select a mapping to preview JSON response.';
+        });
+    }
+
+    // Handle tab state in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'relationships') {
+        const relTab = document.getElementById('relationships-tab');
+        if (relTab) {
+            const tab = new bootstrap.Tab(relTab);
+            tab.show();
+        }
+    }
 });
 </script>
 {% endblock %}

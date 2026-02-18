@@ -55,7 +55,7 @@ Use when syncing publicly exposed partner datasets.
 1) Confirm outbound access to:
    - `https://aledb.org/interop-query/strains` and `/genes`
    - `https://www.pmkbase.com/interop-query/strains`
-   - `http://pankb-preprod.northeurope.cloudapp.azure.com/interop-query/{strains|genes}`
+   - `https://pankb.org/interop-query/{strains|genes}`
    - `http://biggr-prod.northeurope.cloudapp.azure.com/interop-query/{strains|genes}`
 2) Execute:
    ```bash

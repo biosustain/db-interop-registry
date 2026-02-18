@@ -11,6 +11,7 @@ from pathlib import Path
 from utils.cleanup import cleanup_all_data, cleanup_entities
 from utils.ingest import ingest_entities
 from utils.ingest_bulk import ingest_bulk_entities
+from utils.ingest_relationships import ingest_bulk_relationships
 from utils.list import list_registry
 from utils.db_connector import get_session
 from utils.models import BaseModel, Entity, SourceDb
@@ -29,7 +30,11 @@ def ingest(file_path: Path) -> None:
 def ingest_bulk() -> None:
     """Ingest entities from internal databases."""
     ingest_bulk_entities()
-    pass
+
+
+def ingest_relationships() -> None:
+    """Ingest gene-strain relationships from internal databases."""
+    ingest_bulk_relationships()
 
 
 def update(file_path: Path) -> None:
@@ -88,13 +93,16 @@ def main():
     group.add_argument("--cleanup-all", action="store_true", help="Cleanup all entities")
     group.add_argument("--list", action="store_true", help="List all entities")
     group.add_argument("--ingest-bulk", action="store_true", help="Ingest entities from internal databases")
+    group.add_argument("--ingest-relationships", action="store_true", help="Ingest gene-strain relationships from internal databases")
     group.add_argument("--init-db", action="store_true", help="Create tables and seed lookup data")
 
     args = parser.parse_args()
 
     if args.ingest_bulk:
         ingest_bulk()
-    if args.ingest:
+    elif args.ingest_relationships:
+        ingest_relationships()
+    elif args.ingest:
         ingest(args.ingest)
     elif args.update:
         update(args.update)

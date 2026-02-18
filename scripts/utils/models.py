@@ -59,3 +59,32 @@ class AuditLog(db.Model):
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now())
     uid: Mapped[str] = mapped_column(String(255))
     event_type: Mapped[str] = mapped_column(String(255))
+
+
+class GeneStrainRelationship(db.Model):
+    __tablename__ = "gene_strain_relationship"
+
+    gene_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    strain_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now())
+
+
+class EntityUrl(db.Model):
+    __tablename__ = "entity_url"
+
+    uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
+    url_type: Mapped[str] = mapped_column(String(50), primary_key=True)  
+    url: Mapped[str] = mapped_column(String(1024), primary_key=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
+
+
+class RelationshipUrl(db.Model):
+    __tablename__ = "relationship_url"
+
+    gene_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    strain_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
+    url: Mapped[str] = mapped_column(String(1024), primary_key=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
