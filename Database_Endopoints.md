@@ -24,7 +24,7 @@ Endpoints exposed by the databases that this Interop service consumes. These cal
   - Bulk: `GET /interop-query/strains`, `GET /interop-query/genes`
   - Lookup: `POST /interop-query/query-by-gene`, `POST /interop-query/query-by-strain`
   - Pair: `POST /interop-query/query-by-pair`
-- **PanKB** (`http://pankb-preprod.northeurope.cloudapp.azure.com/`)
+- **PanKB** (`https://pankb.org/`)
   - Bulk: `GET /interop-query/strains`, `GET /interop-query/genes`
   - Lookup: `POST /interop-query/query-by-gene`, `POST /interop-query/query-by-strain`
   - Pair: `POST /interop-query/query-by-pair`
