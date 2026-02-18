@@ -74,7 +74,7 @@ def init_db() -> None:
             session.add(Entity(name=name))
 
     # Seed common source DBs (idempotent)
-    required_sources = ["Bigg", "ALEdb", "PMKbase", "Pankb"]
+    required_sources = ["BiGGr", "ALEdb", "PMKbase", "Pankb"]
     for db_name in required_sources:
         if not session.query(SourceDb).filter(SourceDb.db_name == db_name).first():
             session.add(SourceDb(db_name=db_name))

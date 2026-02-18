@@ -56,7 +56,7 @@ def test_ingest_example_file_populates_db(db):
     source_aledb = SourceDb(db_name="ALEdb")
     source_pankb = SourceDb(db_name="Pankb")
     source_pmk = SourceDb(db_name="PMKbase")
-    source_bigg = SourceDb(db_name="Bigg")
+    source_bigg = SourceDb(db_name="BiGGr")
     script_session.add_all([gene_entity, strain_entity, source_aledb, source_pankb, source_pmk, source_bigg])
     script_session.flush()
 
