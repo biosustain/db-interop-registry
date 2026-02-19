@@ -17,7 +17,7 @@ def get_entities(baseURL: str, sourceDB: str, genes: bool = True) -> dict:
 
     Args:
         baseURL: Base URL for the API endpoints
-        sourceDB: Source database name (e.g., "ALEdb", "PMKbase", "Pankb")
+        sourceDB: Source database name (e.g., "ALEdb", "PMKbase", "PanKB")
         genes: Whether to fetch genes (some DBs don't have genes)
 
     Returns:

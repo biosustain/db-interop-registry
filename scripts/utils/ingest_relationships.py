@@ -170,7 +170,7 @@ def ingest_bulk_relationships():
     source_db_cache = build_source_db_cache(session)
 
     databases = [
-        ("https://pankb.org/", "Pankb"),
+        ("https://pankb.org/", "PanKB"),
         # Add more databases here as they implement the gene-strain-pairs endpoint
         # ("https://aledb.org", "ALEdb"),
         # ("https://biggr.org/", "BiGGr"),
