@@ -1,187 +1,200 @@
 """Ingest from internal databases."""
 
-import re
-import sys
 import time
 
 import requests
 from utils.db_connector import get_session
 from utils.ingest import start_ingest
-from utils.ingest_relationships import ingest_relationships_bulk, ingest_entity_urls, ingest_relationship_urls
+from utils.ingest_relationships import (
+    ingest_entity_urls,
+    ingest_relationship_urls,
+    ingest_relationships_bulk,
+)
 
 
-def get_entities(baseURL: str, sourceDB: str, genes: bool = True) -> dict:
+def ingest_strains(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
     """
-    Fetch strains and genes from API endpoints and format them as entities.
-    Also collects URLs if the source database provides them.
-
-    Args:
-        baseURL: Base URL for the API endpoints
-        sourceDB: Source database name (e.g., "ALEdb", "PMKbase", "PanKB")
-        genes: Whether to fetch genes (some DBs don't have genes)
-
-    Returns:
-        Dictionary containing:
-        - entities: list of entity objects with source_db, entity_type, and local_id
-        - entity_urls: list of URL objects with uid, source_db, url_type, and url
-    """
-    entities = []
-    entity_urls = []
-
-    # Fetch strains
-    try:
-        strains_response = requests.get(f"{baseURL}/interop-query/strains")
-        strains_response.raise_for_status()
-        strains_data = strains_response.json()
-
-        # Handle both formats: {"strains": [...]} and [...]
-        if isinstance(strains_data, dict):
-            strains_list = strains_data.get("strains", [])
-        else:
-            strains_list = strains_data
-
-        # Add strain entities - handle both plain strings and dicts with URLs
-        for strain in strains_list:
-            if isinstance(strain, dict):
-                # Format: {"strain": "id", "url": "..."}
-                strain_id = strain.get("strain")
-                url = strain.get("url")
-                entities.append({"source_db": sourceDB, "entity_type": "strain", "local_id": strain_id})
-                if url:
-                    entity_urls.append({"uid": strain_id, "source_db": sourceDB, "url_type": "strain", "url": url})
-            else:
-                # Plain string format
-                entities.append({"source_db": sourceDB, "entity_type": "strain", "local_id": strain})
-    except requests.RequestException as e:
-        print(f"Error fetching strains from {sourceDB}: {e}")
-
-    if not genes:
-        return {"entities": entities, "entity_urls": entity_urls}
-
-    # Fetch genes
-    try:
-        genes_response = requests.get(f"{baseURL}/interop-query/genes")
-        genes_response.raise_for_status()
-        genes_data = genes_response.json()
-
-        # Handle both formats: {"genes": [...]} and [...]
-        if isinstance(genes_data, dict):
-            genes_list = genes_data.get("genes", [])
-        else:
-            genes_list = genes_data
-
-        # Track unique gene IDs to avoid duplicate entities
-        seen_genes = set()
-
-        # Add gene entities - handle both plain strings and dicts with URLs
-        # Same gene may appear multiple times (different species), deduplicate entities but keep all URLs
-        for gene in genes_list:
-            if isinstance(gene, dict):
-                # Format: {"gene": "id", "species": "xxx", "url": "..."}
-                gene_id = gene.get("gene")
-                url = gene.get("url")
-
-                # Only add entity once per gene_id
-                if gene_id and gene_id not in seen_genes:
-                    entities.append({"source_db": sourceDB, "entity_type": "gene", "local_id": gene_id})
-                    seen_genes.add(gene_id)
-
-                # But collect all URLs (same gene can have multiple URLs for different species)
-                if url:
-                    entity_urls.append({"uid": gene_id, "source_db": sourceDB, "url_type": "gene", "url": url})
-            else:
-                # Plain string format
-                if gene and gene not in seen_genes:
-                    entities.append({"source_db": sourceDB, "entity_type": "gene", "local_id": gene})
-                    seen_genes.add(gene)
-    except requests.RequestException as e:
-        print(f"Error fetching genes from {sourceDB}: {e}")
-
-    return {"entities": entities, "entity_urls": entity_urls}
-
-
-def ingest_gene_strain_pairs_streaming(session, baseURL: str, sourceDB: str, batch_size: int = 50000) -> dict:
-    """
-    Fetch and ingest gene-strain pairs in streaming mode (batch by batch).
-    Each batch is written to DB immediately to reduce memory usage.
+    Fetch and ingest strains from a source database (paginated).
+    The API is expected to return:
+        {"strains": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
 
     Args:
         session: Database session
         baseURL: Base URL for the API endpoints
         sourceDB: Source database name
-        batch_size: Number of records per request (default 50000)
+        batch_size: Number of records per HTTP request (default 10000)
 
     Returns:
-        Dictionary with total counts
+        (total_fetched, total_urls)
     """
     skip = 0
-    total = None
-    total_relationships = 0
+    total_fetched = 0
     total_urls = 0
 
     try:
         while True:
-            print(f"  Fetching pairs from {sourceDB}: skip={skip}, limit={batch_size}...")
             response = requests.get(
-                f"{baseURL}/interop-query/gene-strain-pairs",
+                f"{baseURL}/interop-query/strains",
                 params={"skip": skip, "limit": batch_size},
-                timeout=300  # 5 minute timeout per request
+                timeout=300,
             )
             response.raise_for_status()
             data = response.json()
 
-            # Handle paginated response format
-            if isinstance(data, dict) and "pairs" in data:
-                pairs_list = data.get("pairs", [])
-                total = data.get("total", 0)
-                has_more = data.get("has_more", False)
-            else:
-                # Fallback for non-paginated response (legacy format)
-                pairs_list = data if isinstance(data, list) else data.get("pairs", [])
-                has_more = False
+            strains_list = data.get("strains", []) if isinstance(data, dict) else data
+            has_more = data.get("has_more", False) if isinstance(data, dict) else False
 
-            # Process this batch - use dicts to deduplicate
-            unique_relationships = {}  # key: (gene, strain) -> value: dict
-            unique_urls = {}  # key: (gene, strain) -> value: dict
+            entities = []
+            entity_urls = []
+            for strain in strains_list:
+                if isinstance(strain, dict):
+                    strain_id = strain.get("strain")
+                    url = strain.get("url")
+                else:
+                    strain_id = strain
+                    url = None
+                if strain_id:
+                    entities.append({"source_db": sourceDB, "entity_type": "strain", "local_id": strain_id})
+                    if url:
+                        entity_urls.append({"local_id": strain_id, "source_db": sourceDB, "url_type": "strain", "url": url})
 
+            if entities:
+                start_ingest(session, entities)
+            if entity_urls:
+                ingest_entity_urls(session, entity_urls)
+
+            total_fetched += len(strains_list)
+            total_urls += len(entity_urls)
+
+            if not has_more or len(strains_list) == 0:
+                break
+
+            skip += batch_size
+
+    except requests.RequestException as e:
+        print(f"Error fetching strains from {sourceDB}: {e}")
+
+    return total_fetched, total_urls
+
+
+def ingest_genes(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
+    """
+    Fetch and ingest genes from a source database (paginated).
+    The API is expected to return:
+        {"genes": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
+
+    Args:
+        session: Database session
+        baseURL: Base URL for the API endpoints
+        sourceDB: Source database name
+        batch_size: Number of records per HTTP request (default 10000)
+
+    Returns:
+        (total_fetched, total_urls)
+    """
+    skip = 0
+    total_fetched = 0
+    total_urls = 0
+
+    try:
+        while True:
+            response = requests.get(
+                f"{baseURL}/interop-query/genes",
+                params={"skip": skip, "limit": batch_size},
+                timeout=300,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            genes_list = data.get("genes", []) if isinstance(data, dict) else data
+            has_more = data.get("has_more", False) if isinstance(data, dict) else False
+
+            entities = []
+            entity_urls = []
+            for gene in genes_list:
+                if isinstance(gene, dict):
+                    gene_id = gene.get("gene")
+                    url = gene.get("url")
+                else:
+                    gene_id = gene
+                    url = None
+                if gene_id:
+                    entities.append({"source_db": sourceDB, "entity_type": "gene", "local_id": gene_id})
+                if gene_id and url:
+                    entity_urls.append({"local_id": gene_id, "source_db": sourceDB, "url_type": "gene", "url": url})
+
+            if entities:
+                start_ingest(session, entities)
+            if entity_urls:
+                ingest_entity_urls(session, entity_urls)
+
+            total_fetched += len(genes_list)
+            total_urls += len(entity_urls)
+
+            if not has_more or len(genes_list) == 0:
+                break
+
+            skip += batch_size
+
+    except requests.RequestException as e:
+        print(f"Error fetching genes from {sourceDB}: {e}")
+
+    return total_fetched, total_urls
+
+
+def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
+    """
+    Fetch and ingest gene-strain pairs from a source database (paginated).
+    The API is expected to return:
+        {"pairs": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
+
+    Args:
+        session: Database session
+        baseURL: Base URL for the API endpoints
+        sourceDB: Source database name
+        batch_size: Number of records per HTTP request (default 10000)
+
+    Returns:
+        (total_pairs_fetched, total_urls)
+    """
+    skip = 0
+    total_pairs_fetched = 0
+    total_urls = 0
+
+    try:
+        while True:
+            response = requests.get(
+                f"{baseURL}/interop-query/gene-strain-pairs",
+                params={"skip": skip, "limit": batch_size},
+                timeout=300
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            pairs_list = data.get("pairs", [])
+            has_more = data.get("has_more", False)
+
+            relationships = []
+            relationship_urls = []
             for pair in pairs_list:
                 gene = pair.get("gene")
                 strain = pair.get("strain")
-                url = pair.get("gene_strain_url")
+                url = pair.get("url") or pair.get("gene_strain_url")
 
                 if gene and strain:
-                    key = (gene, strain)
-                    # Keep only one per (gene, strain) combination
-                    if key not in unique_relationships:
-                        unique_relationships[key] = {
-                            "gene_uid": gene,
-                            "strain_uid": strain,
-                            "source_db": sourceDB
-                        }
-                    if url and key not in unique_urls:
-                        unique_urls[key] = {
-                            "gene_uid": gene,
-                            "strain_uid": strain,
-                            "source_db": sourceDB,
-                            "url": url
-                        }
+                    relationships.append({"gene_local_id": gene, "strain_local_id": strain, "source_db": sourceDB})
+                    if url:
+                        relationship_urls.append({"gene_local_id": gene, "strain_local_id": strain, "source_db": sourceDB, "url": url})
 
-            batch_relationships = list(unique_relationships.values())
-            batch_urls = list(unique_urls.values())
+            if relationships:
+                ingest_relationships_bulk(session, relationships)
+            if relationship_urls:
+                ingest_relationship_urls(session, relationship_urls)
 
-            # Write this batch to DB immediately
-            if batch_relationships:
-                ingest_relationships_bulk(session, batch_relationships)
-                total_relationships += len(batch_relationships)
+            total_pairs_fetched += len(pairs_list)
+            total_urls += len(relationship_urls)
 
-            if batch_urls:
-                ingest_relationship_urls(session, batch_urls)
-                total_urls += len(batch_urls)
-
-            fetched = len(pairs_list)
-            print(f"  Ingested {fetched} pairs (total so far: {total_relationships}/{total or 'unknown'})")
-
-            if not has_more or fetched == 0:
+            if not has_more or len(pairs_list) == 0:
                 break
 
             skip += batch_size
@@ -189,17 +202,13 @@ def ingest_gene_strain_pairs_streaming(session, baseURL: str, sourceDB: str, bat
     except requests.RequestException as e:
         print(f"Error fetching gene-strain pairs from {sourceDB}: {e}")
 
-    return {"total_relationships": total_relationships, "total_urls": total_urls}
+    return total_pairs_fetched, total_urls
 
 
 def ingest_bulk_entities() -> None:
     """Ingest entities from internal databases."""
 
     print("Ingesting entities from internal databases...")
-
-    # # Temporarily skip entities - only ingest pairs
-    # all_entities = []
-    # all_entity_urls = []
 
     # Define source databases
     sources = [
@@ -209,50 +218,22 @@ def ingest_bulk_entities() -> None:
         {"url": "https://biggr.org", "name": "BiGGr", "genes": True, "pairs": False},
     ]
 
-    # for source in sources:
-    #     print(f"Fetching entities from {source['name']}...")
-    #     result = get_entities(source["url"], source["name"], genes=source["genes"])
-    #     all_entities.extend(result.get("entities", []))
-    #     all_entity_urls.extend(result.get("entity_urls", []))
-
-    # # Clean up gene local_ids
-    # for entity in all_entities:
-    #     if entity["entity_type"] == "strain":
-    #         continue
-
-    #     local_id = entity["local_id"]
-    #     if local_id:
-    #         if " " in local_id:
-    #             local_id = local_id.split(" ")[0]
-    #         local_id = re.sub(r"[^\w\-]", "", local_id)
-    #         local_id = local_id.strip()
-    #         entity["local_id"] = local_id
-
-    # if not isinstance(all_entities, list):
-    #     print("Error: 'entities' must be a list")
-    #     sys.exit(1)
-
     session = get_session()
     start_time = time.time()
+    print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
 
-    # # Ingest entities
-    # print(f"Starting ingestion of {len(all_entities)} entities...")
-    # print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
-    # start_ingest(session, all_entities)
-    # end_time = time.time()
-    # print(f"Entity ingestion completed in {end_time - start_time:.2f} seconds.")
-
-    # # Ingest entity URLs
-    # if all_entity_urls:
-    #     print(f"Ingesting {len(all_entity_urls)} entity URLs...")
-    #     ingest_entity_urls(session, all_entity_urls)
-
-    # Ingest gene-strain relationships (streaming mode - batch by batch)
     for source in sources:
+        print(f"Start ingesting from {source['name']}...")
+        fetched, urls = ingest_strains(session, source["url"], source["name"])
+        print(f"  Strains: fetched {fetched}, URLs {urls}")
+
+        if source.get("genes"):
+            fetched, urls = ingest_genes(session, source["url"], source["name"])
+            print(f"  Genes: fetched {fetched}, URLs {urls}")
+
         if source.get("pairs"):
-            print(f"Fetching and ingesting gene-strain pairs from {source['name']} (streaming)...")
-            result = ingest_gene_strain_pairs_streaming(session, source["url"], source["name"])
-            print(f"  Completed: {result['total_relationships']} relationships, {result['total_urls']} URLs")
+            fetched, urls = ingest_gene_strain_pairs(session, source["url"], source["name"])
+            print(f"  Pairs: fetched {fetched}, URLs {urls}")
 
     total_time = time.time() - start_time
     print(f"Total ingestion completed in {total_time:.2f} seconds.")

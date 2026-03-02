@@ -33,7 +33,7 @@ class Mapping(db.Model):
     entity_type_id: Mapped[int] = mapped_column(ForeignKey("entity.id", ondelete="CASCADE"), primary_key=True)
     local_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     uid: Mapped[str] = mapped_column(String(255))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
 
 
 class Synonym(db.Model):
@@ -41,7 +41,7 @@ class Synonym(db.Model):
 
     uid: Mapped[str] = mapped_column(String(255), primary_key=True)
     synonym: Mapped[str] = mapped_column(String(255), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
 
 
 class Registry(db.Model):
@@ -67,15 +67,15 @@ class GeneStrainRelationship(db.Model):
     gene_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
     strain_uid: Mapped[str] = mapped_column(String(255), primary_key=True)
     source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
 
 
 class EntityUrl(db.Model):
     __tablename__ = "entity_url"
 
-    uid: Mapped[str] = mapped_column(String(255), primary_key=True)
+    local_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
-    url_type: Mapped[str] = mapped_column(String(50), primary_key=True)  
+    url_type: Mapped[str] = mapped_column(String(50), primary_key=True)
     url: Mapped[str] = mapped_column(String(1024), primary_key=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
 

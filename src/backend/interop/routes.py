@@ -220,13 +220,12 @@ def index():
         for uid, local_id in parent_mappings:
             uid_to_local_ids.setdefault(uid, set()).add(local_id)
 
-    # Fetch entity URLs for the mappings (entity_url.uid stores local_id, not uid)
-    # Now supports multiple URLs per entity
+    # Fetch entity URLs for the mappings
     entity_url_map: dict[tuple[str, int], list[str]] = {}
     if local_id_list:
         entity_url_rows = db.session.execute(
-            select(EntityUrl.uid, EntityUrl.source_db_id, EntityUrl.url)
-            .where(EntityUrl.uid.in_(local_id_list))
+            select(EntityUrl.local_id, EntityUrl.source_db_id, EntityUrl.url)
+            .where(EntityUrl.local_id.in_(local_id_list))
         ).all()
         for local_id, source_db_id, url in entity_url_rows:
             key = (local_id, source_db_id)
@@ -277,7 +276,7 @@ def index():
             GeneStrainRelationship.gene_uid,
             GeneStrainRelationship.strain_uid,
             GeneStrainRelationship.source_db_id,
-            GeneStrainRelationship.created_at,
+            GeneStrainRelationship.updated_at,
             SourceDb.db_name.label("source_db_name"),
             GeneMapping.local_id.label("gene_local_id"),
             StrainMapping.local_id.label("strain_local_id"),
@@ -340,7 +339,7 @@ def index():
             "strain_local_id": r.strain_local_id,
             "source_db_name": r.source_db_name,
             "urls": rel_url_map.get((r.gene_uid, r.strain_uid, r.source_db_id), []),
-            "created_at_display": _format_updated_at(r.created_at),
+            "updated_at_display": _format_updated_at(r.updated_at),
         }
         for r in rel_result
     ]
