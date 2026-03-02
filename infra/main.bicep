@@ -62,7 +62,7 @@ module postgresServer 'core/database/postgresql/flexibleserver.bicep' = {
     storage: {
       storageSizeGB: 32
     }
-    version: '15'
+    version: '18'
     administratorLogin: postgresUser
     administratorLoginPassword: postgresPassword
     databaseNames: [postgresDatabaseName]
