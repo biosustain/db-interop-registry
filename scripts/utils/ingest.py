@@ -47,7 +47,7 @@ def generate_uid(entity_type: str, local_id: str) -> str:
     """
     # Create a deterministic hash from the local_id
     hash_input = f"{entity_type}:{local_id}".encode()
-    hash_digest = hashlib.sha256(hash_input).hexdigest()[:8]
+    hash_digest = hashlib.sha256(hash_input).hexdigest()[:12]
 
     # Add appropriate prefix
     prefix = "G-" if entity_type.lower() == "gene" else "S-"
