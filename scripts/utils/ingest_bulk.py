@@ -7,41 +7,50 @@ from utils.db_connector import get_session
 from utils.ingest import start_ingest
 from utils.ingest_relationships import (
     get_source_db_map,
-    get_source_db_map,
     ingest_entity_urls,
     ingest_relationship_urls,
     ingest_relationships_bulk,
 )
 
 
-def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 10000) -> tuple[int, int]:
+def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 100000) -> tuple[int, int]:
     """
-    Fetch and ingest strains from a source database (paginated).
-    The API is expected to return:
-        {"strains": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
+    Fetch and ingest strains from a source database.
+    Supports both cursor-based and skip-based pagination automatically.
 
     Args:
         session: Database session
         baseURL: Base URL for the API endpoints
         sourceDB: Source database name
-        batch_size: Number of records per HTTP request (default 10000)
+        batch_size: Number of records per HTTP request 
 
     Returns:
         (total_fetched, total_urls)
     """
-    skip = 0
     total_fetched = 0
     total_urls = 0
+    cursor = None
+    skip = 0
+    use_cursor = None
 
     try:
         while True:
+            params = {"limit": batch_size}
+            if use_cursor and cursor is not None:
+                params["after"] = cursor
+            elif use_cursor is False:
+                params["skip"] = skip
+
             response = requests.get(
                 f"{baseURL}/interop-query/strains",
-                params={"skip": skip, "limit": batch_size},
+                params=params,
                 timeout=300,
             )
             response.raise_for_status()
             data = response.json()
+
+            if use_cursor is None:
+                use_cursor = "next_cursor" in data if isinstance(data, dict) else False
 
             strains_list = data.get("strains", []) if isinstance(data, dict) else data
             has_more = data.get("has_more", False) if isinstance(data, dict) else False
@@ -71,7 +80,10 @@ def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str
             if not has_more or len(strains_list) == 0:
                 break
 
-            skip += batch_size
+            if use_cursor:
+                cursor = data.get("next_cursor") if isinstance(data, dict) else None
+            else:
+                skip += batch_size
 
     except requests.RequestException as e:
         print(f"Error fetching strains from {sourceDB}: {e}")
@@ -79,11 +91,10 @@ def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str
     return total_fetched, total_urls
 
 
-def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 10000) -> tuple[int, int]:
+def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 100000) -> tuple[int, int]:
     """
-    Fetch and ingest genes from a source database (paginated).
-    The API is expected to return:
-        {"genes": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
+    Fetch and ingest genes from a source database.
+    Supports both cursor-based and skip-based pagination automatically.
 
     Args:
         session: Database session
@@ -94,19 +105,30 @@ def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, 
     Returns:
         (total_fetched, total_urls)
     """
-    skip = 0
     total_fetched = 0
     total_urls = 0
+    cursor = None
+    skip = 0
+    use_cursor = None
 
     try:
         while True:
+            params = {"limit": batch_size}
+            if use_cursor and cursor is not None:
+                params["after"] = cursor
+            elif use_cursor is False:
+                params["skip"] = skip
+
             response = requests.get(
                 f"{baseURL}/interop-query/genes",
-                params={"skip": skip, "limit": batch_size},
+                params=params,
                 timeout=300,
             )
             response.raise_for_status()
             data = response.json()
+
+            if use_cursor is None:
+                use_cursor = "next_cursor" in data if isinstance(data, dict) else False
 
             genes_list = data.get("genes", []) if isinstance(data, dict) else data
             has_more = data.get("has_more", False) if isinstance(data, dict) else False
@@ -136,7 +158,10 @@ def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, 
             if not has_more or len(genes_list) == 0:
                 break
 
-            skip += batch_size
+            if use_cursor:
+                cursor = data.get("next_cursor") if isinstance(data, dict) else None
+            else:
+                skip += batch_size
 
     except requests.RequestException as e:
         print(f"Error fetching genes from {sourceDB}: {e}")
@@ -146,35 +171,51 @@ def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, 
 
 def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 100000) -> tuple[int, int]:
     """
-    Fetch and ingest gene-strain pairs from a source database (paginated).
-    The API is expected to return:
-        {"pairs": [...], "skip": int, "limit": int, "has_more": bool, "total"?: int}
+    Fetch and ingest gene-strain pairs from a source database.
+    Supports both cursor-based and skip-based pagination automatically.
+
 
     Args:
         session: Database session
         baseURL: Base URL for the API endpoints
         sourceDB: Source database name
-        batch_size: Number of records per HTTP request (default 10000)
+        batch_size: Number of records per HTTP request
 
     Returns:
         (total_pairs_fetched, total_urls)
     """
-    skip = 0
     total_pairs_fetched = 0
     total_urls = 0
+    cursor = None  
+    skip = 0      
+    use_cursor = None  
 
     try:
         while True:
+            params = {"limit": batch_size}
+            if use_cursor and cursor is not None:
+                params["after"] = cursor
+            elif use_cursor is False:
+                params["skip"] = skip
+
             response = requests.get(
                 f"{baseURL}/interop-query/gene-strain-pairs",
-                params={"skip": skip, "limit": batch_size},
+                params=params,
                 timeout=300
             )
             response.raise_for_status()
             data = response.json()
 
+            if use_cursor is None:
+                use_cursor = "next_cursor" in data
+
             pairs_list = data.get("pairs", [])
             has_more = data.get("has_more", False)
+
+            if use_cursor:
+                cursor = data.get("next_cursor")
+            else:
+                skip += batch_size
 
             relationships = []
             relationship_urls = []
@@ -198,8 +239,6 @@ def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, source_db_map
 
             if not has_more or len(pairs_list) == 0:
                 break
-
-            skip += batch_size
 
     except requests.RequestException as e:
         print(f"Error fetching gene-strain pairs from {sourceDB}: {e}")
@@ -226,13 +265,13 @@ def ingest_bulk_entities() -> None:
     print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
 
     for source in sources:
-        # print(f"Start ingesting from {source['name']}...")
+        print(f"Start ingesting from {source['name']}...")
         fetched, urls = ingest_strains(session, source["url"], source["name"], source_db_map)
-        # print(f"  Strains: fetched {fetched}, URLs {urls}")
+        print(f"  Strains: fetched {fetched}, URLs {urls}")
 
-        # if source.get("genes"):
+        if source.get("genes"):
             fetched, urls = ingest_genes(session, source["url"], source["name"], source_db_map)
-            # print(f"  Genes: fetched {fetched}, URLs {urls}")
+            print(f"  Genes: fetched {fetched}, URLs {urls}")
 
         if source.get("pairs"):
             fetched, urls = ingest_gene_strain_pairs(session, source["url"], source["name"], source_db_map)
