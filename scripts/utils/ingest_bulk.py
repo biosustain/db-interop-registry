@@ -6,13 +6,15 @@ import requests
 from utils.db_connector import get_session
 from utils.ingest import start_ingest
 from utils.ingest_relationships import (
+    get_source_db_map,
+    get_source_db_map,
     ingest_entity_urls,
     ingest_relationship_urls,
     ingest_relationships_bulk,
 )
 
 
-def ingest_strains(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
+def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 10000) -> tuple[int, int]:
     """
     Fetch and ingest strains from a source database (paginated).
     The API is expected to return:
@@ -61,7 +63,7 @@ def ingest_strains(session, baseURL: str, sourceDB: str, batch_size: int = 10000
             if entities:
                 start_ingest(session, entities)
             if entity_urls:
-                ingest_entity_urls(session, entity_urls)
+                ingest_entity_urls(session, entity_urls, source_db_map)
 
             total_fetched += len(strains_list)
             total_urls += len(entity_urls)
@@ -77,7 +79,7 @@ def ingest_strains(session, baseURL: str, sourceDB: str, batch_size: int = 10000
     return total_fetched, total_urls
 
 
-def ingest_genes(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
+def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 10000) -> tuple[int, int]:
     """
     Fetch and ingest genes from a source database (paginated).
     The API is expected to return:
@@ -126,7 +128,7 @@ def ingest_genes(session, baseURL: str, sourceDB: str, batch_size: int = 10000) 
             if entities:
                 start_ingest(session, entities)
             if entity_urls:
-                ingest_entity_urls(session, entity_urls)
+                ingest_entity_urls(session, entity_urls, source_db_map)
 
             total_fetched += len(genes_list)
             total_urls += len(entity_urls)
@@ -142,7 +144,7 @@ def ingest_genes(session, baseURL: str, sourceDB: str, batch_size: int = 10000) 
     return total_fetched, total_urls
 
 
-def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, batch_size: int = 10000) -> tuple[int, int]:
+def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, source_db_map: dict[str, int], batch_size: int = 100000) -> tuple[int, int]:
     """
     Fetch and ingest gene-strain pairs from a source database (paginated).
     The API is expected to return:
@@ -187,9 +189,9 @@ def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, batch_size: i
                         relationship_urls.append({"gene_local_id": gene, "strain_local_id": strain, "source_db": sourceDB, "url": url})
 
             if relationships:
-                ingest_relationships_bulk(session, relationships)
+                ingest_relationships_bulk(session, relationships, source_db_map)
             if relationship_urls:
-                ingest_relationship_urls(session, relationship_urls)
+                ingest_relationship_urls(session, relationship_urls, source_db_map)
 
             total_pairs_fetched += len(pairs_list)
             total_urls += len(relationship_urls)
@@ -219,20 +221,21 @@ def ingest_bulk_entities() -> None:
     ]
 
     session = get_session()
+    source_db_map = get_source_db_map(session)
     start_time = time.time()
     print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(start_time))}")
 
     for source in sources:
-        print(f"Start ingesting from {source['name']}...")
-        fetched, urls = ingest_strains(session, source["url"], source["name"])
-        print(f"  Strains: fetched {fetched}, URLs {urls}")
+        # print(f"Start ingesting from {source['name']}...")
+        fetched, urls = ingest_strains(session, source["url"], source["name"], source_db_map)
+        # print(f"  Strains: fetched {fetched}, URLs {urls}")
 
-        if source.get("genes"):
-            fetched, urls = ingest_genes(session, source["url"], source["name"])
-            print(f"  Genes: fetched {fetched}, URLs {urls}")
+        # if source.get("genes"):
+            fetched, urls = ingest_genes(session, source["url"], source["name"], source_db_map)
+            # print(f"  Genes: fetched {fetched}, URLs {urls}")
 
         if source.get("pairs"):
-            fetched, urls = ingest_gene_strain_pairs(session, source["url"], source["name"])
+            fetched, urls = ingest_gene_strain_pairs(session, source["url"], source["name"], source_db_map)
             print(f"  Pairs: fetched {fetched}, URLs {urls}")
 
     total_time = time.time() - start_time

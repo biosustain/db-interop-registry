@@ -5,21 +5,20 @@ from utils.ingest import generate_uid
 from utils.models import EntityUrl, GeneStrainRelationship, RelationshipUrl, SourceDb
 
 
-def ingest_relationships_bulk(session, relationships: list[dict]) -> int:
+def ingest_relationships_bulk(session, relationships: list[dict], source_db_map: dict[str, int]) -> int:
     """
     Ingest gene-strain relationships from bulk data (already contains source_db).
 
     Args:
         session: Database session
         relationships: List of dicts with keys: gene_local_id, strain_local_id, source_db
+        source_db_map: Mapping of source_db name to id
 
     Returns:
         Number of unique relationships submitted (before DB conflict check)
     """
     if not relationships:
         return 0
-
-    source_db_map = get_source_db_map(session)
 
     unique_records: dict[tuple, dict] = {}
     for rel in relationships:
@@ -60,7 +59,7 @@ def get_source_db_map(session) -> dict[str, int]:
     return {db.db_name: db.id for db in source_dbs}
 
 
-def ingest_entity_urls(session, entity_urls: list[dict]) -> int:
+def ingest_entity_urls(session, entity_urls: list[dict], source_db_map: dict[str, int]) -> int:
     """
     Ingest entity URLs into the entity_url table.
     Supports multiple URLs per entity (primary key now includes url).
@@ -68,14 +67,13 @@ def ingest_entity_urls(session, entity_urls: list[dict]) -> int:
     Args:
         session: SQLAlchemy session
         entity_urls: List of dicts with keys: local_id, source_db, url_type, url
+        source_db_map: Mapping of source_db name to id
 
     Returns:
         Number of unique URLs submitted (before DB conflict check)
     """
     if not entity_urls:
         return 0
-
-    source_db_map = get_source_db_map(session)
 
     # Prepare records for bulk insert, deduplicating by primary key within the batch
     unique_records: dict[tuple, dict] = {}
@@ -110,7 +108,7 @@ def ingest_entity_urls(session, entity_urls: list[dict]) -> int:
     return len(records)
 
 
-def ingest_relationship_urls(session, relationship_urls: list[dict]) -> int:
+def ingest_relationship_urls(session, relationship_urls: list[dict], source_db_map: dict[str, int]) -> int:
     """
     Ingest relationship URLs into the relationship_url table.
     Supports multiple URLs per relationship (primary key now includes url).
@@ -118,14 +116,13 @@ def ingest_relationship_urls(session, relationship_urls: list[dict]) -> int:
     Args:
         session: SQLAlchemy session
         relationship_urls: List of dicts with keys: gene_local_id, strain_local_id, source_db, url
+        source_db_map: Mapping of source_db name to id
 
     Returns:
         Number of unique URLs submitted (before DB conflict check)
     """
     if not relationship_urls:
         return 0
-
-    source_db_map = get_source_db_map(session)
 
     unique_records: dict[tuple, dict] = {}
     for url_data in relationship_urls:
