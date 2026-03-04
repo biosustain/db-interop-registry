@@ -92,6 +92,7 @@ def execute_with_retry(session, stmt, max_retries=3):
             return
         except OperationalError as e:
             session.rollback()
+            session.close()
             if attempt == max_retries:
                 raise
             wait = 2 ** attempt
@@ -107,6 +108,7 @@ def commit_with_retry(session, max_retries=3):
             return
         except OperationalError as e:
             session.rollback()
+            session.close()
             if attempt == max_retries:
                 raise
             wait = 2 ** attempt
