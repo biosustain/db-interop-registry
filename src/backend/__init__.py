@@ -54,6 +54,7 @@ def create_app(config=None):
     app.config.update(
         SQLALCHEMY_DATABASE_URI=app.config.get("DATABASE_URI"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
     )
     if config:
         app.config.update(config)

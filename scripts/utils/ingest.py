@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from sqlalchemy import tuple_
-from utils.db_connector import get_session
+from utils.db_connector import commit_with_retry, get_session
 from utils.models import AuditLog, Entity, Mapping, Registry, SourceDb, Synonym
 from utils.ncbi_assemblies import fetch_ncbi_assemblies, fetch_ncbi_gene_synonyms
 from utils.uniprot import fetch_uniprot_id
@@ -328,22 +328,14 @@ def start_ingest(session, entities: list[dict], chunk_size: int = BATCH_SIZE) ->
 
         if len(batch) >= chunk_size:
             success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
-            try:
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
+            commit_with_retry(session)
             successful_ingests += success
             failed_ingests += failure
             batch.clear()
 
     if batch:
         success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
-        try:
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
+        commit_with_retry(session)
         successful_ingests += success
         failed_ingests += failure
 

@@ -2,12 +2,14 @@
 
 import logging
 import os
+import time
 from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ def get_azure_session():
     connection_string = f"postgresql://{username}:{password}@{host}/{database}?sslmode=require"
     logger.info(f"Connecting to Azure PostgreSQL: {host}/{database}")
 
-    engine = create_engine(connection_string)
+    engine = create_engine(connection_string, pool_pre_ping=True)
     Session = sessionmaker(bind=engine)
 
     return Session()
@@ -79,3 +81,34 @@ def get_session():
         return get_azure_session()
     else:
         raise ValueError(f"Invalid CONNECTION_MODE: {mode}. Use 'local' or 'azure'")
+
+
+def execute_with_retry(session, stmt, max_retries=3):
+    """Execute a statement and commit, retrying on transient connection errors (e.g. SSL drop)."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            session.execute(stmt)
+            session.commit()
+            return
+        except OperationalError as e:
+            session.rollback()
+            if attempt == max_retries:
+                raise
+            wait = 2 ** attempt
+            print(f"  Connection error (attempt {attempt}/{max_retries}): {e}. Retrying in {wait}s...")
+            time.sleep(wait)
+
+
+def commit_with_retry(session, max_retries=3):
+    """Commit pending changes, retrying on transient connection errors (e.g. SSL drop)."""
+    for attempt in range(1, max_retries + 1):
+        try:
+            session.commit()
+            return
+        except OperationalError as e:
+            session.rollback()
+            if attempt == max_retries:
+                raise
+            wait = 2 ** attempt
+            print(f"  Connection error (attempt {attempt}/{max_retries}): {e}. Retrying in {wait}s...")
+            time.sleep(wait)

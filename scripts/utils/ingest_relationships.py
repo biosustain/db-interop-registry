@@ -1,6 +1,7 @@
 """Ingest gene-strain relationships and URLs from external databases."""
 
 from sqlalchemy.dialects.postgresql import insert
+from utils.db_connector import execute_with_retry
 from utils.ingest import generate_uid
 from utils.models import EntityUrl, GeneStrainRelationship, RelationshipUrl, SourceDb
 
@@ -48,8 +49,7 @@ def ingest_relationships_bulk(session, relationships: list[dict], source_db_map:
     stmt = stmt.on_conflict_do_nothing(
         index_elements=["gene_uid", "strain_uid", "source_db_id"]
     )
-    session.execute(stmt)
-    session.commit()
+    execute_with_retry(session, stmt)
     return len(prepared)
 
 
@@ -103,8 +103,7 @@ def ingest_entity_urls(session, entity_urls: list[dict], source_db_map: dict[str
     stmt = stmt.on_conflict_do_nothing(
         index_elements=["local_id", "source_db_id", "url_type", "url"]
     )
-    session.execute(stmt)
-    session.commit()
+    execute_with_retry(session, stmt)
     return len(records)
 
 
@@ -154,6 +153,5 @@ def ingest_relationship_urls(session, relationship_urls: list[dict], source_db_m
     stmt = stmt.on_conflict_do_nothing(
         index_elements=["gene_uid", "strain_uid", "source_db_id", "url"]
     )
-    session.execute(stmt)
-    session.commit()
+    execute_with_retry(session, stmt)
     return len(records)
