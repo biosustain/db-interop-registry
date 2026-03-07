@@ -59,10 +59,10 @@ def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str
             entity_urls = []
             for strain in strains_list:
                 if isinstance(strain, dict):
-                    strain_id = strain.get("strain")
-                    url = strain.get("url")
+                    strain_id = strain.get("strain", "").strip()
+                    url = strain.get("url", "").strip()
                 else:
-                    strain_id = strain
+                    strain_id = strain.strip() if isinstance(strain, str) else strain
                     url = None
                 if strain_id:
                     entities.append({"source_db": sourceDB, "entity_type": "strain", "local_id": strain_id})
@@ -137,10 +137,10 @@ def ingest_genes(session, baseURL: str, sourceDB: str, source_db_map: dict[str, 
             entity_urls = []
             for gene in genes_list:
                 if isinstance(gene, dict):
-                    gene_id = gene.get("gene")
-                    url = gene.get("url")
+                    gene_id = gene.get("gene", "").strip()
+                    url = gene.get("url", "").strip()
                 else:
-                    gene_id = gene
+                    gene_id = gene.strip() if isinstance(gene, str) else gene
                     url = None
                 if gene_id:
                     entities.append({"source_db": sourceDB, "entity_type": "gene", "local_id": gene_id})
@@ -220,9 +220,9 @@ def ingest_gene_strain_pairs(session, baseURL: str, sourceDB: str, source_db_map
             relationships = []
             relationship_urls = []
             for pair in pairs_list:
-                gene = pair.get("gene")
-                strain = pair.get("strain")
-                url = pair.get("url") or pair.get("gene_strain_url")
+                gene = pair.get("gene", "").strip()
+                strain = pair.get("strain", "").strip()
+                url = (pair.get("url") or pair.get("gene_strain_url") or "").strip()
 
                 if gene and strain:
                     relationships.append({"gene_local_id": gene, "strain_local_id": strain, "source_db": sourceDB})
