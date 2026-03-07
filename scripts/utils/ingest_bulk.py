@@ -3,7 +3,7 @@
 import time
 
 import requests
-from utils.db_connector import get_session
+from utils.db_connector import commit_with_retry, get_session
 from utils.ingest import start_ingest
 from utils.ingest_relationships import (
     get_source_db_map,
@@ -279,3 +279,36 @@ def ingest_bulk_entities() -> None:
 
     total_time = time.time() - start_time
     print(f"Total ingestion completed in {total_time:.2f} seconds.")
+
+    # Update precomputed row counts for the frontend
+    print("Updating table_stats...")
+    update_table_stats(session)
+    print("table_stats updated.")
+
+
+def update_table_stats(session) -> None:
+    """Update precomputed row counts in table_stats for large tables."""
+    from sqlalchemy import text
+
+    upsert = text(
+        "INSERT INTO table_stats (table_name, row_count, updated_at) "
+        "VALUES (:name, :count, now()) "
+        "ON CONFLICT (table_name) DO UPDATE SET row_count = :count, updated_at = now()"
+    )
+
+    for table in ["mapping", "gene_strain_relationship"]:
+        count = session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
+        session.execute(upsert, {"name": table, "count": count})
+        print(f"  {table}: {count:,}")
+
+    rows = session.execute(text(
+        "SELECT e.name, COUNT(*) FROM mapping m "
+        "JOIN entity e ON m.entity_type_id = e.id "
+        "GROUP BY e.name"
+    )).all()
+    for entity_name, count in rows:
+        key = f"mapping_{entity_name.lower()}"
+        session.execute(upsert, {"name": key, "count": count})
+        print(f"  {key}: {count:,}")
+
+    commit_with_retry(session)

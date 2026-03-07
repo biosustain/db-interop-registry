@@ -97,3 +97,12 @@ class RelationshipUrl(db.Model):
     source_db_id: Mapped[int] = mapped_column(ForeignKey("source_db.id", ondelete="CASCADE"), primary_key=True)
     url: Mapped[str] = mapped_column(String(1024), primary_key=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())
+
+
+class TableStats(db.Model):
+    """Precomputes exact row counts for large tables to avoid slow COUNT(*) queries."""
+    __tablename__ = "table_stats"
+
+    table_name: Mapped[str] = mapped_column(String(255), primary_key=True)
+    row_count: Mapped[int] = mapped_column(db.BigInteger, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now())

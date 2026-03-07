@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 from backend import db
 from backend.interop import bp
 from backend.interop.enums import ResourceType
-from backend.interop.models import Entity, EntityUrl, GeneStrainRelationship, Mapping, RelationshipUrl, SourceDb, Synonym
+from backend.interop.models import Entity, EntityUrl, GeneStrainRelationship, Mapping, RelationshipUrl, SourceDb, Synonym, TableStats
 from backend.interop.services.registry import RegistryService
 
 SCHEMAS_DIR = Path(__file__).resolve().parent / "schemas"
@@ -142,16 +142,15 @@ def index():
     search_query = request.args.get("q", "").strip() if active_tab == "entities" else ""
     rel_search_query = request.args.get("q", "").strip() if active_tab == "relationships" else ""
 
-    # === Entities Tab Data ===
-    total_count = db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
-    entity_counts_result = db.session.execute(
-        select(Entity.name, db.func.count(Mapping.uid))
-        .join(Mapping, Mapping.entity_type_id == Entity.id)
-        .group_by(Entity.name)
+    # === Entities Tab Data (from precomputed table_stats) ===
+    stats_rows = db.session.execute(
+        select(TableStats.table_name, TableStats.row_count)
+        .where(TableStats.table_name.in_(["mapping", "mapping_gene", "mapping_strain"]))
     ).all()
-    entity_counts = {name.lower(): count for name, count in entity_counts_result}
-    gene_count = entity_counts.get("gene", 0)
-    strain_count = entity_counts.get("strain", 0)
+    stats = {name: count for name, count in stats_rows}
+    total_count = stats.get("mapping") or db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
+    gene_count = stats.get("mapping_gene", 0)
+    strain_count = stats.get("mapping_strain", 0)
     stmt = (
         select(
             Mapping,
@@ -262,9 +261,10 @@ def index():
     ]
 
     # === Relationships Tab Data ===
-    total_relationships = db.session.execute(
-        select(db.func.count()).select_from(GeneStrainRelationship)
-    ).scalar_one()
+    cached = db.session.execute(
+        select(TableStats.row_count).where(TableStats.table_name == "gene_strain_relationship")
+    ).scalar_one_or_none()
+    total_relationships = cached if cached is not None else 0
 
     # Alias Mapping table for gene and strain local_id lookups
     from sqlalchemy.orm import aliased
