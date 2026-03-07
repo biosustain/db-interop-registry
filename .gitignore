@@ -360,3 +360,6 @@ docs/_build/
 
 # MacOS Specific
 **/.DS_Store
+
+# nohup
+*.out
