@@ -67,6 +67,8 @@ def ingest_strains(session, baseURL: str, sourceDB: str, source_db_map: dict[str
                 if strain_id:
                     entities.append({"source_db": sourceDB, "entity_type": "strain", "local_id": strain_id})
                     if url:
+                        if url.startswith("/"):
+                            url = f"{baseURL}{url}"
                         entity_urls.append({"local_id": strain_id, "source_db": sourceDB, "url_type": "strain", "url": url})
 
             if entities:
