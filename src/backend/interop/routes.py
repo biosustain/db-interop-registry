@@ -4,7 +4,7 @@ from pathlib import Path
 
 from flasgger import swag_from
 from flask import jsonify, render_template, request
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, tuple_
 
 from backend import db
 from backend.interop import bp
@@ -115,6 +115,99 @@ def get_registry_pair(pair_identifiers: str):
     return jsonify(result), 200
 
 
+@bp.route("/api/relationships", methods=["GET"])
+def api_relationships():
+    """Return relationships as JSON for AJAX loading."""
+    search_query = request.args.get("q", "").strip()
+
+    cached = db.session.execute(
+        select(TableStats.row_count).where(TableStats.table_name == "gene_strain_relationship")
+    ).scalar_one_or_none()
+    total_relationships = cached if cached is not None else 0
+
+    rel_stmt = (
+        select(
+            GeneStrainRelationship.gene_uid,
+            GeneStrainRelationship.strain_uid,
+            GeneStrainRelationship.source_db_id,
+            GeneStrainRelationship.updated_at,
+            SourceDb.db_name.label("source_db_name"),
+        )
+        .join(SourceDb, GeneStrainRelationship.source_db_id == SourceDb.id)
+        .order_by(GeneStrainRelationship.gene_uid.asc())
+        .limit(1000)
+    )
+
+    if search_query:
+        like_value = f"%{search_query}%"
+        matching_uids = db.session.execute(
+            select(Mapping.uid).where(Mapping.local_id.ilike(like_value))
+        ).scalars().all()
+
+        conditions = [
+            GeneStrainRelationship.gene_uid.ilike(like_value),
+            GeneStrainRelationship.strain_uid.ilike(like_value)
+        ]
+        if matching_uids:
+            conditions.extend([
+                GeneStrainRelationship.gene_uid.in_(matching_uids),
+                GeneStrainRelationship.strain_uid.in_(matching_uids)
+            ])
+        rel_stmt = rel_stmt.where(or_(*conditions))
+
+    rel_result = db.session.execute(rel_stmt).all()
+
+    all_uids = {r.gene_uid for r in rel_result} | {r.strain_uid for r in rel_result}
+    uid_to_local: dict[str, str] = {}
+    if all_uids:
+        rows = db.session.execute(
+            select(Mapping.uid, Mapping.local_id).where(Mapping.uid.in_(all_uids))
+        ).all()
+        for uid, local_id in rows:
+            uid_to_local[uid] = local_id
+
+    rel_keys = [(r.gene_uid, r.strain_uid, r.source_db_id) for r in rel_result]
+    rel_url_map: dict[tuple[str, str, int], list[str]] = {}
+    if rel_keys:
+        rel_url_rows = db.session.execute(
+            select(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id, RelationshipUrl.url)
+            .where(
+                tuple_(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id).in_(rel_keys)
+            )
+        ).all()
+        for gene_uid, strain_uid, source_db_id, url in rel_url_rows:
+            key = (gene_uid, strain_uid, source_db_id)
+            if key not in rel_url_map:
+                rel_url_map[key] = []
+            rel_url_map[key].append(url)
+
+    def _fmt(dt):
+        if dt is None:
+            return "Unknown"
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC).strftime("%b %d, %Y %H:%M UTC")
+
+    relationships = [
+        {
+            "gene_uid": r.gene_uid,
+            "gene_local_id": uid_to_local.get(r.gene_uid, ""),
+            "strain_uid": r.strain_uid,
+            "strain_local_id": uid_to_local.get(r.strain_uid, ""),
+            "source_db_name": r.source_db_name,
+            "urls": rel_url_map.get((r.gene_uid, r.strain_uid, r.source_db_id), []),
+            "updated_at_display": _fmt(r.updated_at),
+        }
+        for r in rel_result
+    ]
+
+    return jsonify({
+        "total": total_relationships,
+        "relationships": relationships,
+        "search_query": search_query,
+    })
+
+
 @bp.route("/", methods=["GET"])
 @swag_from(
     {
@@ -138,9 +231,7 @@ def get_registry_pair(pair_identifiers: str):
 )
 def index():
     """Render the HTML view of available mappings and relationships."""
-    active_tab = request.args.get("tab", "entities")
-    search_query = request.args.get("q", "").strip() if active_tab == "entities" else ""
-    rel_search_query = request.args.get("q", "").strip() if active_tab == "relationships" else ""
+    search_query = request.args.get("q", "").strip()
 
     # === Entities Tab Data (from precomputed table_stats) ===
     stats_rows = db.session.execute(
@@ -260,94 +351,8 @@ def index():
         for mapping, source_db_name, entity_type_name in result
     ]
 
-    # === Relationships Tab Data ===
-    cached = db.session.execute(
-        select(TableStats.row_count).where(TableStats.table_name == "gene_strain_relationship")
-    ).scalar_one_or_none()
-    total_relationships = cached if cached is not None else 0
-
-    # Alias Mapping table for gene and strain local_id lookups
-    from sqlalchemy.orm import aliased
-    GeneMapping = aliased(Mapping, name='gene_mapping')
-    StrainMapping = aliased(Mapping, name='strain_mapping')
-
-    rel_stmt = (
-        select(
-            GeneStrainRelationship.gene_uid,
-            GeneStrainRelationship.strain_uid,
-            GeneStrainRelationship.source_db_id,
-            GeneStrainRelationship.updated_at,
-            SourceDb.db_name.label("source_db_name"),
-            GeneMapping.local_id.label("gene_local_id"),
-            StrainMapping.local_id.label("strain_local_id"),
-        )
-        .join(SourceDb, GeneStrainRelationship.source_db_id == SourceDb.id)
-        .outerjoin(GeneMapping, db.and_(
-            GeneStrainRelationship.gene_uid == GeneMapping.uid,
-            GeneStrainRelationship.source_db_id == GeneMapping.source_db_id
-        ))
-        .outerjoin(StrainMapping, db.and_(
-            GeneStrainRelationship.strain_uid == StrainMapping.uid,
-            GeneStrainRelationship.source_db_id == StrainMapping.source_db_id
-        ))
-        .order_by(GeneMapping.local_id.asc())
-        .limit(1000)
-    )
-
-    if rel_search_query:
-        like_value = f"%{rel_search_query}%"
-        # Also search by local_id - find UIDs that match the local_id
-        matching_uids = db.session.execute(
-            select(Mapping.uid).where(Mapping.local_id.ilike(like_value))
-        ).scalars().all()
-
-        conditions = [
-            GeneStrainRelationship.gene_uid.ilike(like_value),
-            GeneStrainRelationship.strain_uid.ilike(like_value)
-        ]
-        if matching_uids:
-            conditions.extend([
-                GeneStrainRelationship.gene_uid.in_(matching_uids),
-                GeneStrainRelationship.strain_uid.in_(matching_uids)
-            ])
-        rel_stmt = rel_stmt.where(or_(*conditions))
-
-    rel_result = db.session.execute(rel_stmt).all()
-
-    # Fetch relationship URLs (now supports multiple URLs per relationship)
-    rel_keys = [(r.gene_uid, r.strain_uid, r.source_db_id) for r in rel_result]
-    rel_url_map: dict[tuple[str, str, int], list[str]] = {}
-    if rel_keys:
-        from sqlalchemy import tuple_
-        rel_url_rows = db.session.execute(
-            select(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id, RelationshipUrl.url)
-            .where(
-                tuple_(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id).in_(rel_keys)
-            )
-        ).all()
-        for gene_uid, strain_uid, source_db_id, url in rel_url_rows:
-            key = (gene_uid, strain_uid, source_db_id)
-            if key not in rel_url_map:
-                rel_url_map[key] = []
-            rel_url_map[key].append(url)
-
-    relationships = [
-        {
-            "gene_uid": r.gene_uid,
-            "gene_local_id": r.gene_local_id,
-            "strain_uid": r.strain_uid,
-            "strain_local_id": r.strain_local_id,
-            "source_db_name": r.source_db_name,
-            "urls": rel_url_map.get((r.gene_uid, r.strain_uid, r.source_db_id), []),
-            "updated_at_display": _format_updated_at(r.updated_at),
-        }
-        for r in rel_result
-    ]
-
     return render_template(
         "mappings_list.html",
-        active_tab=active_tab,
-        # Entities tab
         mappings=mappings,
         search_query=search_query,
         result_cap=1000,
@@ -356,11 +361,6 @@ def index():
         strain_count=strain_count,
         result_gene_count=result_entity_counts["gene"],
         result_strain_count=result_entity_counts["strain"],
-        # Relationships tab
-        relationships=relationships,
-        rel_search_query=rel_search_query,
-        rel_result_cap=1000,
-        total_relationships=total_relationships,
     )
 
 

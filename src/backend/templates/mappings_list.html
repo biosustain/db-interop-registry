@@ -53,12 +53,12 @@
 <!-- Tabs Navigation -->
 <ul class="nav nav-tabs mb-3" id="registryTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link {{ 'active' if active_tab == 'entities' else '' }}" id="entities-tab" data-bs-toggle="tab" data-bs-target="#entities-pane" type="button" role="tab" aria-controls="entities-pane" aria-selected="{{ 'true' if active_tab == 'entities' else 'false' }}">
+        <button class="nav-link active" id="entities-tab" data-bs-toggle="tab" data-bs-target="#entities-pane" type="button" role="tab" aria-controls="entities-pane" aria-selected="true">
             Entities
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link {{ 'active' if active_tab == 'relationships' else '' }}" id="relationships-tab" data-bs-toggle="tab" data-bs-target="#relationships-pane" type="button" role="tab" aria-controls="relationships-pane" aria-selected="{{ 'true' if active_tab == 'relationships' else 'false' }}">
+        <button class="nav-link" id="relationships-tab" data-bs-toggle="tab" data-bs-target="#relationships-pane" type="button" role="tab" aria-controls="relationships-pane" aria-selected="false">
             Relationships
         </button>
     </li>
@@ -67,7 +67,7 @@
 <!-- Tab Content -->
 <div class="tab-content" id="registryTabsContent">
     <!-- Entities Tab -->
-    <div class="tab-pane fade {{ 'show active' if active_tab == 'entities' else '' }}" id="entities-pane" role="tabpanel" aria-labelledby="entities-tab">
+    <div class="tab-pane fade show active" id="entities-pane" role="tabpanel" aria-labelledby="entities-tab">
         <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
             <input type="hidden" name="tab" value="entities">
             <div class="input-group">
@@ -174,82 +174,23 @@
         </div>
     </div>
 
-    <!-- Relationships Tab -->
-    <div class="tab-pane fade {{ 'show active' if active_tab == 'relationships' else '' }}" id="relationships-pane" role="tabpanel" aria-labelledby="relationships-tab">
-        <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
-            <input type="hidden" name="tab" value="relationships">
+    <!-- Relationships Tab (AJAX loaded) -->
+    <div class="tab-pane fade" id="relationships-pane" role="tabpanel" aria-labelledby="relationships-tab">
+        <form class="mb-3" id="rel-search-form">
             <div class="input-group">
                 <input
                     type="text"
-                    name="q"
+                    id="rel-search-input"
                     class="form-control"
                     placeholder="Search by Gene/Strain UID or Local ID"
-                    value="{{ rel_search_query }}"
                     aria-label="Search relationships"
                 />
                 <button class="btn btn-primary" type="submit">Search</button>
             </div>
         </form>
-
-        {% if relationships %}
-        <p class="text-muted">
-            <span class="d-block mb-1">Total relationships: {{ '{:,}'.format(total_relationships) if total_relationships is not none else 'unknown' }}</span>
-            {% if rel_search_query %}
-            <span>Displaying results matching <strong>{{ rel_search_query }}</strong></span>
-            {% else %}
-            Displaying up to {{ rel_result_cap }} result{% if rel_result_cap != 1 %}s{% endif %}
-            {% endif %}
-        </p>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Gene UID</th>
-                    <th>Gene Local ID</th>
-                    <th>Strain UID</th>
-                    <th>Strain Local ID</th>
-                    <th>Source DB</th>
-                    <th>URL</th>
-                    <th>Created At</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for rel in relationships %}
-                <tr>
-                    <td class="text-start">
-                        <div class="btn-group" role="group">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_pair', pair_identifiers=(rel.gene_local_id or rel.gene_uid) + ',' + (rel.strain_local_id or rel.strain_uid)) }}" target="_blank" rel="noopener">
-                                Query
-                            </a>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview-pair" data-gene-id="{{ rel.gene_local_id or rel.gene_uid }}" data-strain-id="{{ rel.strain_local_id or rel.strain_uid }}">
-                                Preview
-                            </button>
-                        </div>
-                    </td>
-                    <td>{{ rel.gene_uid }}</td>
-                    <td>{{ rel.gene_local_id or '&mdash;' | safe }}</td>
-                    <td>{{ rel.strain_uid }}</td>
-                    <td>{{ rel.strain_local_id or '&mdash;' | safe }}</td>
-                    <td>{{ rel.source_db_name }}</td>
-                    <td>
-                        {% if rel.urls %}
-                            {% for url in rel.urls %}
-                            <a href="{{ url }}" target="_blank" rel="noopener" class="url-link" title="{{ url }}">
-                                View{% if loop.length > 1 %} {{ loop.index }}{% endif %}
-                            </a>{% if not loop.last %} {% endif %}
-                            {% endfor %}
-                        {% else %}
-                        &mdash;
-                        {% endif %}
-                    </td>
-                    <td>{{ rel.updated_at_display }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p>No relationships found{% if rel_search_query %} for "<strong>{{ rel_search_query }}</strong>"{% endif %}.</p>
-        {% endif %}
+        <div id="rel-content">
+            <p class="text-muted">Loading relationships...</p>
+        </div>
     </div>
 </div>
 
@@ -300,8 +241,89 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Preview for gene-strain pairs
-    document.querySelectorAll('button[data-action="preview-pair"]').forEach((button) => {
+    if (detailClose) {
+        detailClose.addEventListener('click', () => {
+            detailContainer.classList.add('d-none');
+            detailColumn.classList.add('d-none');
+            detailOutput.textContent = 'Select a mapping to preview JSON response.';
+        });
+    }
+
+    // AJAX loading for Relationships tab
+    let relLoaded = false;
+
+    function loadRelationships(query) {
+        const container = document.getElementById('rel-content');
+        container.innerHTML = '<p class="text-muted">Loading relationships...</p>';
+
+        const params = query ? `?q=${encodeURIComponent(query)}` : '';
+        fetch(`/api/relationships${params}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.relationships || data.relationships.length === 0) {
+                    const msg = query
+                        ? `No relationships found for "<strong>${query}</strong>".`
+                        : 'No relationships found.';
+                    container.innerHTML = `<p>${msg}</p>`;
+                    return;
+                }
+
+                const totalFmt = data.total != null ? data.total.toLocaleString() : 'unknown';
+                let summary = `<p class="text-muted"><span class="d-block mb-1">Total relationships: ${totalFmt}</span>`;
+                if (query) {
+                    summary += `<span>Displaying results matching <strong>${query}</strong></span>`;
+                } else {
+                    summary += `Displaying up to 1,000 results`;
+                }
+                summary += '</p>';
+
+                let html = summary + `<table class="table"><thead><tr>
+                    <th></th><th>Gene UID</th><th>Gene Local ID</th>
+                    <th>Strain UID</th><th>Strain Local ID</th>
+                    <th>Source DB</th><th>URL</th><th>Created At</th>
+                </tr></thead><tbody>`;
+
+                data.relationships.forEach(rel => {
+                    const geneId = rel.gene_local_id || rel.gene_uid;
+                    const strainId = rel.strain_local_id || rel.strain_uid;
+                    const queryUrl = `/pair/${encodeURIComponent(geneId)},${encodeURIComponent(strainId)}`;
+
+                    let urlsHtml = '&mdash;';
+                    if (rel.urls && rel.urls.length > 0) {
+                        urlsHtml = rel.urls.map((u, i) => {
+                            const label = rel.urls.length > 1 ? `View ${i + 1}` : 'View';
+                            return `<a href="${u}" target="_blank" rel="noopener" class="url-link" title="${u}">${label}</a>`;
+                        }).join(' ');
+                    }
+
+                    html += `<tr>
+                        <td class="text-start">
+                            <div class="btn-group" role="group">
+                                <a class="btn btn-sm btn-outline-primary" href="${queryUrl}" target="_blank" rel="noopener">Query</a>
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview-pair" data-gene-id="${geneId}" data-strain-id="${strainId}">Preview</button>
+                            </div>
+                        </td>
+                        <td>${rel.gene_uid}</td>
+                        <td>${rel.gene_local_id || '&mdash;'}</td>
+                        <td>${rel.strain_uid}</td>
+                        <td>${rel.strain_local_id || '&mdash;'}</td>
+                        <td>${rel.source_db_name}</td>
+                        <td>${urlsHtml}</td>
+                        <td>${rel.updated_at_display}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+
+                // Re-bind preview buttons for newly rendered rows
+                container.querySelectorAll('button[data-action="preview-pair"]').forEach(bindPreviewPair);
+            })
+            .catch(err => {
+                container.innerHTML = `<p class="text-danger">Failed to load relationships: ${err}</p>`;
+            });
+    }
+
+    function bindPreviewPair(button) {
         button.addEventListener('click', async () => {
             const geneId = button.dataset.geneId;
             const strainId = button.dataset.strainId;
@@ -317,33 +339,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     detailOutput.textContent = `Error ${response.status}: ${text}`;
                     return;
                 }
-
                 const data = await response.json();
                 detailOutput.textContent = JSON.stringify(data, null, 2);
             } catch (error) {
                 detailOutput.textContent = `Failed to fetch data: ${error}`;
             }
         });
+    }
+
+    // Preload relationships data on page load so it's ready when tab is clicked
+    relLoaded = true;
+    loadRelationships('');
+
+    // Relationships search form
+    document.getElementById('rel-search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        relLoaded = true;
+        const query = document.getElementById('rel-search-input').value.trim();
+        loadRelationships(query);
     });
-
-    if (detailClose) {
-        detailClose.addEventListener('click', () => {
-            detailContainer.classList.add('d-none');
-            detailColumn.classList.add('d-none');
-            detailOutput.textContent = 'Select a mapping to preview JSON response.';
-        });
-    }
-
-    // Handle tab state in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    if (tabParam === 'relationships') {
-        const relTab = document.getElementById('relationships-tab');
-        if (relTab) {
-            const tab = new bootstrap.Tab(relTab);
-            tab.show();
-        }
-    }
 });
 </script>
 {% endblock %}
