@@ -40,6 +40,31 @@
             white-space: nowrap;
             display: inline-block;
         }
+
+        /* Fixed column widths for entities table */
+        .entities-table { table-layout: fixed; width: 100%; }
+        .entities-table th:nth-child(1),
+        .entities-table td:nth-child(1) { width: 11%; }  /* Actions >=11 */
+        .entities-table th:nth-child(2),
+        .entities-table td:nth-child(2) { width: 12%; }  /* UID >=12 */ 
+        .entities-table th:nth-child(3),
+        .entities-table td:nth-child(3) { width: 18%; }  /* Local ID */
+        .entities-table th:nth-child(4),
+        .entities-table td:nth-child(4) { width: 17%; }  /* Synonyms */
+        .entities-table th:nth-child(5),
+        .entities-table td:nth-child(5) { width: 8%; }  /* Source DB */
+        .entities-table th:nth-child(6),
+        .entities-table td:nth-child(6) { width: 8%; }  /* Entity Type */
+        .entities-table th:nth-child(7),
+        .entities-table td:nth-child(7) { width: 17%; }  /* URL */
+        .entities-table th:nth-child(8),
+        .entities-table td:nth-child(8) { width: 9%; }  /* Updated At */
+
+        .entities-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .entities-table td:nth-child(3),
+        .entities-table td:nth-child(4),
+        .entities-table td:nth-child(7) { white-space: normal; word-break: break-word; overflow: visible; text-overflow: clip; }
+
     </style>
 {% endblock %}
 {% block content %}
@@ -99,14 +124,14 @@
     Displaying up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}
     {% endif %}
 </p>
-<table class="table mappings-list-table">
+<table class="table entities-table" id="entities-table">
     <thead>
         <tr>
             <th></th>
-            <th>Uid</th>
-            <th>Local Id</th>
+            <th>UID</th>
+            <th>Local ID</th>
             <th>Synonyms</th>
-            <th>Source Db</th>
+            <th>Source DB</th>
             <th>Entity Type</th>
             <th>URL</th>
             <th>Updated At</th>
