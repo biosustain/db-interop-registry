@@ -186,7 +186,7 @@ def api_relationships():
             return "Unknown"
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
-        return dt.astimezone(UTC).strftime("%b %d, %Y %H:%M UTC")
+        return dt.astimezone(UTC).strftime("%Y-%m-%d")
 
     relationships = [
         {
@@ -265,7 +265,7 @@ def index():
             return "Unknown"
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
-        return dt.astimezone(UTC).strftime("%b %d, %Y %H:%M UTC")
+        return dt.astimezone(UTC).strftime("%Y-%m-%d")
 
     result_entity_counts = {"gene": 0, "strain": 0}
     for mapping, source_db_name, entity_type_name in result:
