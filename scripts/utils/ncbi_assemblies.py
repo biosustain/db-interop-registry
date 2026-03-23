@@ -7,8 +7,13 @@ import httpx
 NCBI_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 NCBI_ESEARCH_URL = f"{NCBI_BASE_URL}/esearch.fcgi"
 NCBI_ESUMMARY_URL = f"{NCBI_BASE_URL}/esummary.fcgi"
-NCBI_ASSEMBLY_TERM = "txid{local_id}[Organism:noexp]"
+NCBI_ASSEMBLY_TERM = (
+    'txid{local_id}[Organism:noexp]'
+    ' AND "latest refseq"[filter]'
+    ' AND "complete genome"[filter]'
+)
 NCBI_TIMEOUT = 30.0
+MAX_ASSEMBLIES = 10  # Cap the number of assembly accessions returned
 ESEARCH_PAGE_SIZE = 500  # IDs returned per search page
 ESUMMARY_BATCH_SIZE = 200  # IDs resolved to accession strings per call
 
@@ -16,7 +21,9 @@ ESUMMARY_BATCH_SIZE = 200  # IDs resolved to accession strings per call
 @lru_cache(maxsize=2048)
 def fetch_ncbi_assemblies(local_id: str) -> tuple[str, ...]:
     """
-    Fetch Assembly Accessions (GCF_..., GCA_...) for a taxonomy ID by searching db=assembly.
+    Fetch Assembly Accessions for a taxonomy ID from NCBI.
+
+    Filters to latest RefSeq + complete genome only, capped at MAX_ASSEMBLIES results.
     """
     local_id_str = str(local_id).strip()
     if not local_id_str:
@@ -35,7 +42,10 @@ def fetch_ncbi_assemblies(local_id: str) -> tuple[str, ...]:
     try:
         with httpx.Client(timeout=NCBI_TIMEOUT) as client:
             while expected_total is None or retstart < expected_total:
-                retmax = ESEARCH_PAGE_SIZE
+                remaining = MAX_ASSEMBLIES - len(assembly_uids)
+                if remaining <= 0:
+                    break
+                retmax = min(ESEARCH_PAGE_SIZE, remaining)
                 if expected_total is not None:
                     retmax = max(1, min(retmax, expected_total - retstart))
 
