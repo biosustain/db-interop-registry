@@ -208,6 +208,12 @@ def api_relationships():
     })
 
 
+@bp.route("/databases", methods=["GET"])
+def databases():
+    """Page describing the collaborating databases."""
+    return render_template("databases.html")
+
+
 @bp.route("/", methods=["GET"])
 @swag_from(
     {

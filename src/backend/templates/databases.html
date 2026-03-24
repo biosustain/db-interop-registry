@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Collaborating Databases{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .db-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            transition: box-shadow 0.2s;
+        }
+        .db-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .db-card h5 {
+            margin-bottom: 0.75rem;
+        }
+        .db-card h5 a {
+            color: #212529;
+            text-decoration: none;
+        }
+        .db-card h5 a:hover {
+            color: #0d6efd;
+        }
+        .db-card p {
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+        .db-card .badge {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .badge-genes { background-color: #3b6fa0; }
+        .badge-strains { background-color: #38845c; }
+        .badge-mutations { background-color: #9b4444; }
+        .badge-models { background-color: #7b5ea7; }
+        .badge-pangenomics { background-color: #96651a; }
+        .badge-phenotypes { background-color: #637088; }
+    </style>
+{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Collaborating Databases</h2>
+
+<p class="text-muted mb-4">
+    Interop DB integrates gene and strain data from the following databases,
+    assigning unified identifiers to enable cross-database queries.
+</p>
+
+<div class="db-card">
+    <h5><a href="https://aledb.org" target="_blank">ALEdb <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <p>
+        The Adaptive Laboratory Evolution Database. ALEdb reports acquired 
+        mutations and experimental conditions, supports mutation 
+        cross-reference/search, exports, and includes a publication bibliome 
+        across multiple model organisms.
+    </p>
+    <span class="badge badge-genes me-1">Genes</span>
+    <span class="badge badge-strains me-1">Strains</span>
+    <span class="badge badge-mutations">Mutations</span>
+</div>
+
+<div class="db-card">
+    <h5><a href="https://biggr.org" target="_blank">BiGGr <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <p>
+        The Biochemical, Genetic and Genomic knowledgebase of large-scale
+        metabolic reconstructions. BiGGr hosts genome-scale metabolic models,
+        linking genes to metabolic reactions and enabling constraint-based
+        modeling of microbial metabolism.
+    </p>
+    <span class="badge badge-genes me-1">Genes</span>
+    <span class="badge badge-strains me-1">Strains</span>
+    <span class="badge badge-models">Metabolic Models</span>
+</div>
+
+<div class="db-card">
+    <h5><a href="https://pankb.org" target="_blank">PanKB <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <p>
+        The Pangenome Knowledgebase. PanKB is an interactive microbial pangenome
+        knowledgebase with pangenome analytics, alleleomes, gene annotation
+        tables, phylogenetic views, global search, downloads, and a bibliome
+        of open-access pangenomic publications.
+    </p>
+    <span class="badge badge-genes me-1">Genes</span>
+    <span class="badge badge-strains me-1">Strains</span>
+    <span class="badge badge-pangenomics">Pangenomics</span>
+</div>
+
+<div class="db-card">
+    <h5><a href="https://www.pmkbase.com" target="_blank">PMkbase <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <p>
+        The Phenotype MicroArray Knowledgebase. PMMkbase is built on BiOLOG
+        Phenotype MicroArray data, using a workflow of curation, quality check,
+        kinetic parameter extraction, and growth/no-growth calls to track strain
+        traits alongside sequences.
+    </p>
+    <span class="badge badge-strains me-1">Strains</span>
+    <span class="badge badge-phenotypes">Phenotypes</span>
+</div>
+
+{% endblock %}
