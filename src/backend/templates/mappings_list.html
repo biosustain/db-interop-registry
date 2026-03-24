@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const rGeneFmt = data.result_gene_count != null ? data.result_gene_count.toLocaleString() : 'unknown';
                     summary += `<span>Displaying results matching <strong>${query}</strong> (${rStrainFmt} strains, ${rGeneFmt} genes)</span>`;
                 } else {
-                    summary += `Displaying up to 1,000 results`;
+                    summary += `Displaying up to 200 results`;
                 }
                 summary += '</p>';
 
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (query) {
                     summary += `<span>Displaying results matching <strong>${query}</strong></span>`;
                 } else {
-                    summary += `Displaying up to 1,000 results`;
+                    summary += `Displaying up to 200 results`;
                 }
                 summary += '</p>';
 
