@@ -228,7 +228,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (query) {
                     const rStrainFmt = data.result_strain_count != null ? data.result_strain_count.toLocaleString() : 'unknown';
                     const rGeneFmt = data.result_gene_count != null ? data.result_gene_count.toLocaleString() : 'unknown';
-                    summary += `<span>Displaying results matching <strong>${query}</strong> (${rStrainFmt} strains, ${rGeneFmt} genes)</span>`;
+                    const entityResultCount = data.entities.length.toLocaleString();
+                    summary += `<span>Displaying ${entityResultCount} results matching <strong>${query}</strong> (${rStrainFmt} strains, ${rGeneFmt} genes)</span>`;
                 } else {
                     summary += `Displaying up to 200 results`;
                 }
@@ -306,9 +307,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 const totalFmt = data.total != null ? data.total.toLocaleString() : 'unknown';
+                const resultCount = data.relationships.length.toLocaleString();
                 let summary = `<p class="text-muted"><span class="d-block mb-1">Total relationships: ${totalFmt}</span>`;
                 if (query) {
-                    summary += `<span>Displaying results matching <strong>${query}</strong></span>`;
+                    summary += `<span>Displaying ${resultCount} results matching <strong>${query}</strong></span>`;
                 } else {
                     summary += `Displaying up to 200 results`;
                 }

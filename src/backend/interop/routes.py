@@ -140,22 +140,31 @@ def api_relationships():
 
     if search_query:
         like_value = f"%{search_query}%"
+        # Resolve search term to UIDs via mapping table (small & indexed)
         matching_uids = db.session.execute(
-            select(Mapping.uid).where(Mapping.local_id.ilike(like_value))
+            select(Mapping.uid).where(
+                or_(Mapping.local_id.ilike(like_value), Mapping.uid.ilike(like_value))
+            )
         ).scalars().all()
 
-        conditions = [
-            GeneStrainRelationship.gene_uid.ilike(like_value),
-            GeneStrainRelationship.strain_uid.ilike(like_value)
-        ]
-        if matching_uids:
-            conditions.extend([
-                GeneStrainRelationship.gene_uid.in_(matching_uids),
-                GeneStrainRelationship.strain_uid.in_(matching_uids)
-            ])
-        rel_stmt = rel_stmt.where(or_(*conditions))
+        # Also check synonyms
+        synonym_uids = db.session.execute(
+            select(Synonym.uid).where(Synonym.synonym.ilike(like_value))
+        ).scalars().all()
 
-    rel_result = db.session.execute(rel_stmt).all()
+        all_matched_uids = list(set(matching_uids + synonym_uids))
+
+        if not all_matched_uids:
+            rel_result = []
+        else:
+            # Use exact IN matches on indexed UID columns (fast)
+            rel_stmt = rel_stmt.where(or_(
+                GeneStrainRelationship.gene_uid.in_(all_matched_uids),
+                GeneStrainRelationship.strain_uid.in_(all_matched_uids)
+            ))
+            rel_result = db.session.execute(rel_stmt).all()
+    else:
+        rel_result = db.session.execute(rel_stmt).all()
 
     all_uids = {r.gene_uid for r in rel_result} | {r.strain_uid for r in rel_result}
     uid_to_local: dict[str, str] = {}
