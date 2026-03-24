@@ -239,7 +239,18 @@ def api_entities():
 
     if search_query:
         like_value = f"%{search_query}%"
-        stmt = stmt.where(or_(Mapping.uid.ilike(like_value), Mapping.local_id.ilike(like_value)))
+        # Find UIDs whose synonyms match the search query
+        matching_uids_via_synonym = db.session.execute(
+            select(Synonym.uid).where(Synonym.synonym.ilike(like_value))
+        ).scalars().all()
+
+        conditions = [
+            Mapping.uid.ilike(like_value),
+            Mapping.local_id.ilike(like_value),
+        ]
+        if matching_uids_via_synonym:
+            conditions.append(Mapping.uid.in_(matching_uids_via_synonym))
+        stmt = stmt.where(or_(*conditions))
 
     result = db.session.execute(stmt).all()
 
