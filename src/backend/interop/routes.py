@@ -3,7 +3,7 @@ from datetime import UTC
 from pathlib import Path
 
 from flasgger import swag_from
-from flask import jsonify, render_template, request
+from flask import jsonify, make_response, render_template, request
 from sqlalchemy import or_, select, tuple_
 
 from backend import db
@@ -201,11 +201,14 @@ def api_relationships():
         for r in rel_result
     ]
 
-    return jsonify({
+    resp = make_response(jsonify({
         "total": total_relationships,
         "relationships": relationships,
         "search_query": search_query,
-    })
+    }))
+    if not search_query:
+        resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
 
 
 @bp.route("/api/entities", methods=["GET"])
@@ -333,7 +336,7 @@ def api_entities():
             "updated_at_display": _fmt(mapping.updated_at),
         })
 
-    return jsonify({
+    resp = make_response(jsonify({
         "total": total_count,
         "gene_count": gene_count,
         "strain_count": strain_count,
@@ -341,7 +344,10 @@ def api_entities():
         "result_strain_count": result_entity_counts["strain"],
         "entities": entities,
         "search_query": search_query,
-    })
+    }))
+    if not search_query:
+        resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
 
 
 @bp.route("/databases", methods=["GET"])
