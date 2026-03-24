@@ -46,9 +46,9 @@
         .entities-table th:nth-child(1),
         .entities-table td:nth-child(1) { width: 11%; }  /* Actions >=11 */
         .entities-table th:nth-child(2),
-        .entities-table td:nth-child(2) { width: 12%; }  /* UID >=12 */ 
+        .entities-table td:nth-child(2) { width: 13%; }  /* UID >=12 */ 
         .entities-table th:nth-child(3),
-        .entities-table td:nth-child(3) { width: 18%; }  /* Local ID */
+        .entities-table td:nth-child(3) { width: 17%; }  /* Local ID */
         .entities-table th:nth-child(4),
         .entities-table td:nth-child(4) { width: 17%; }  /* Synonyms */
         .entities-table th:nth-child(5),
@@ -91,110 +91,23 @@
 
 <!-- Tab Content -->
 <div class="tab-content" id="registryTabsContent">
-    <!-- Entities Tab -->
+    <!-- Entities Tab (AJAX loaded) -->
     <div class="tab-pane fade show active" id="entities-pane" role="tabpanel" aria-labelledby="entities-tab">
-        <form class="mb-3" method="get" action="{{ url_for('interop.index') }}">
-            <input type="hidden" name="tab" value="entities">
+        <form class="mb-3" id="entity-search-form">
             <div class="input-group">
                 <input
                     type="text"
-                    name="q"
+                    id="entity-search-input"
                     class="form-control"
                     placeholder="Search by UID or Local ID"
-                    value="{{ search_query }}"
                     aria-label="Search mappings"
                 />
                 <button class="btn btn-primary" type="submit">Search</button>
             </div>
         </form>
-
         <div class="position-relative">
-            <div id="mappings-column">
-                {% if mappings %}
-{% set total_display = total_count if total_count is not none else None %}
-{% set strain_display = '{:,}'.format(strain_count) if strain_count is not none else 'unknown' %}
-{% set gene_display = '{:,}'.format(gene_count) if gene_count is not none else 'unknown' %}
-{% set result_strain_display = '{:,}'.format(result_strain_count) if result_strain_count is not none else 'unknown' %}
-{% set result_gene_display = '{:,}'.format(result_gene_count) if result_gene_count is not none else 'unknown' %}
-<p class="text-muted">
-    <span class="d-block mb-1">Total entities in registry: {% if total_display is not none %}{{ '{:,}'.format(total_display) }}{% else %}unknown{% endif %} ({{ strain_display }} strains, {{ gene_display }} genes)</span>
-    {% if search_query %}
-    <span>Displaying results matching <strong>{{ search_query }}</strong> ({{ result_strain_display }} strains, {{ result_gene_display }} genes)</span>
-    {% else %}
-    Displaying up to {{ result_cap }} result{% if result_cap != 1 %}s{% endif %}
-    {% endif %}
-</p>
-<table class="table entities-table" id="entities-table">
-    <thead>
-        <tr>
-            <th></th>
-            <th>UID</th>
-            <th>Local ID</th>
-            <th>Synonyms</th>
-            <th>Source DB</th>
-            <th>Entity Type</th>
-            <th>URL</th>
-            <th>Updated At</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in mappings %}
-        <tr>
-            <td class="text-start">
-                {% if item.mapping.entity_type_id == 1 %}
-                <div class="btn-group" role="group">
-                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='gene', local_id_or_uid=item.mapping.local_id) }}" target="_blank" rel="noopener">
-                        Query
-                    </a>
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview" data-resource="gene" data-local-id="{{ item.mapping.local_id }}">
-                        Preview
-                    </button>
-                </div>
-                {% elif item.mapping.entity_type_id == 2 %}
-                <div class="btn-group" role="group">
-                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('interop.get_registry_item', resource='strain', local_id_or_uid=item.mapping.local_id) }}" target="_blank" rel="noopener">
-                        Query
-                    </a>
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview" data-resource="strain" data-local-id="{{ item.mapping.local_id }}">
-                        Preview
-                    </button>
-                </div>
-                {% else %}
-                <button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Unsupported entity type">
-                    Query
-                </button>
-                {% endif %}
-            </td>
-            <td>{{ item.mapping.uid }}</td>
-            <td>{{ item.mapping.local_id }}</td>
-            <td>
-                {% if item.synonyms %}
-                    {{ item.synonyms | join(', ') }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>{{ item.source_db_name }}</td>
-            <td>{{ item.entity_type_name }}</td>
-            <td>
-                {% if item.entity_urls %}
-                    {% for url in item.entity_urls %}
-                    <a href="{{ url }}" target="_blank" rel="noopener" class="url-link" title="{{ url }}">
-                        View{% if loop.length > 1 %} {{ loop.index }}{% endif %}
-                    </a>{% if not loop.last %} {% endif %}
-                    {% endfor %}
-                {% else %}
-                &mdash;
-                {% endif %}
-            </td>
-            <td>{{ item.updated_at_display }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-        </table>
-        {% else %}
-<p>No mappings found{% if search_query %} for "<strong>{{ search_query }}</strong>"{% endif %}.</p>
-        {% endif %}
+            <div id="entity-content">
+                <p class="text-muted">Loading entities...</p>
             </div>
         </div>
     </div>
@@ -241,31 +154,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const detailColumn = document.getElementById('detail-column');
     const detailClose = document.getElementById('detail-close');
 
-    document.querySelectorAll('button[data-action="preview"]').forEach((button) => {
-        button.addEventListener('click', async () => {
-            const resource = button.dataset.resource;
-            const localId = button.dataset.localId;
-
-            detailOutput.textContent = 'Loading...';
-            detailContainer.classList.remove('d-none');
-            detailColumn.classList.remove('d-none');
-
-            try {
-                const response = await fetch(`/${resource}/${encodeURIComponent(localId)}`);
-                if (!response.ok) {
-                    const text = await response.text();
-                    detailOutput.textContent = `Error ${response.status}: ${text}`;
-                    return;
-                }
-
-                const data = await response.json();
-                detailOutput.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                detailOutput.textContent = `Failed to fetch data: ${error}`;
-            }
-        });
-    });
-
     if (detailClose) {
         detailClose.addEventListener('click', () => {
             detailContainer.classList.add('d-none');
@@ -274,9 +162,133 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // AJAX loading for Relationships tab
-    let relLoaded = false;
+    function bindPreviewButtons(container) {
+        container.querySelectorAll('button[data-action="preview"]').forEach(button => {
+            button.addEventListener('click', async () => {
+                const resource = button.dataset.resource;
+                const localId = button.dataset.localId;
+                detailOutput.textContent = 'Loading...';
+                detailContainer.classList.remove('d-none');
+                detailColumn.classList.remove('d-none');
+                try {
+                    const response = await fetch(`/${resource}/${encodeURIComponent(localId)}`);
+                    if (!response.ok) {
+                        detailOutput.textContent = `Error ${response.status}: ${await response.text()}`;
+                        return;
+                    }
+                    detailOutput.textContent = JSON.stringify(await response.json(), null, 2);
+                } catch (error) {
+                    detailOutput.textContent = `Failed to fetch data: ${error}`;
+                }
+            });
+        });
+        container.querySelectorAll('button[data-action="preview-pair"]').forEach(button => {
+            button.addEventListener('click', async () => {
+                const geneId = button.dataset.geneId;
+                const strainId = button.dataset.strainId;
+                detailOutput.textContent = 'Loading...';
+                detailContainer.classList.remove('d-none');
+                detailColumn.classList.remove('d-none');
+                try {
+                    const response = await fetch(`/pair/${encodeURIComponent(geneId)},${encodeURIComponent(strainId)}`);
+                    if (!response.ok) {
+                        detailOutput.textContent = `Error ${response.status}: ${await response.text()}`;
+                        return;
+                    }
+                    detailOutput.textContent = JSON.stringify(await response.json(), null, 2);
+                } catch (error) {
+                    detailOutput.textContent = `Failed to fetch data: ${error}`;
+                }
+            });
+        });
+    }
 
+    // === Entities Tab (AJAX) ===
+    function loadEntities(query) {
+        const container = document.getElementById('entity-content');
+        container.innerHTML = '<p class="text-muted">Loading entities...</p>';
+
+        const params = query ? `?q=${encodeURIComponent(query)}` : '';
+        fetch(`/api/entities${params}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.entities || data.entities.length === 0) {
+                    const msg = query
+                        ? `No entities found for "<strong>${query}</strong>".`
+                        : 'No entities found.';
+                    container.innerHTML = `<p>${msg}</p>`;
+                    return;
+                }
+
+                const totalFmt = data.total != null ? data.total.toLocaleString() : 'unknown';
+                const strainFmt = data.strain_count != null ? data.strain_count.toLocaleString() : 'unknown';
+                const geneFmt = data.gene_count != null ? data.gene_count.toLocaleString() : 'unknown';
+
+                let summary = `<p class="text-muted"><span class="d-block mb-1">Total entities in registry: ${totalFmt} (${strainFmt} strains, ${geneFmt} genes)</span>`;
+                if (query) {
+                    const rStrainFmt = data.result_strain_count != null ? data.result_strain_count.toLocaleString() : 'unknown';
+                    const rGeneFmt = data.result_gene_count != null ? data.result_gene_count.toLocaleString() : 'unknown';
+                    summary += `<span>Displaying results matching <strong>${query}</strong> (${rStrainFmt} strains, ${rGeneFmt} genes)</span>`;
+                } else {
+                    summary += `Displaying up to 1,000 results`;
+                }
+                summary += '</p>';
+
+                let html = summary + `<table class="table entities-table" id="entities-table"><thead><tr>
+                    <th></th><th>UID</th><th>Local ID</th><th>Synonyms</th>
+                    <th>Source DB</th><th>Entity Type</th><th>URL</th><th>Updated At</th>
+                </tr></thead><tbody>`;
+
+                data.entities.forEach(e => {
+                    const resource = e.entity_type_id === 1 ? 'gene' : (e.entity_type_id === 2 ? 'strain' : null);
+                    let actionsHtml = '';
+                    if (resource) {
+                        actionsHtml = `<div class="btn-group" role="group">
+                            <a class="btn btn-sm btn-outline-primary" href="/${resource}/${encodeURIComponent(e.local_id)}" target="_blank" rel="noopener">Query</a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-action="preview" data-resource="${resource}" data-local-id="${e.local_id}">Preview</button>
+                        </div>`;
+                    }
+
+                    const synonymsHtml = e.synonyms && e.synonyms.length > 0 ? e.synonyms.join(', ') : '&mdash;';
+
+                    let urlsHtml = '&mdash;';
+                    if (e.entity_urls && e.entity_urls.length > 0) {
+                        urlsHtml = e.entity_urls.map((u, i) => {
+                            const label = e.entity_urls.length > 1 ? `View ${i + 1}` : 'View';
+                            return `<a href="${u}" target="_blank" rel="noopener" class="url-link" title="${u}">${label}</a>`;
+                        }).join(' ');
+                    }
+
+                    html += `<tr>
+                        <td class="text-start">${actionsHtml}</td>
+                        <td>${e.uid}</td>
+                        <td>${e.local_id}</td>
+                        <td>${synonymsHtml}</td>
+                        <td>${e.source_db_name}</td>
+                        <td>${e.entity_type_name}</td>
+                        <td>${urlsHtml}</td>
+                        <td>${e.updated_at_display}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+                bindPreviewButtons(container);
+            })
+            .catch(err => {
+                container.innerHTML = `<p class="text-danger">Failed to load entities: ${err}</p>`;
+            });
+    }
+
+    // Preload entities
+    loadEntities('');
+
+    document.getElementById('entity-search-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const query = document.getElementById('entity-search-input').value.trim();
+        loadEntities(query);
+    });
+
+    // === Relationships Tab (AJAX) ===
     function loadRelationships(query) {
         const container = document.getElementById('rel-content');
         container.innerHTML = '<p class="text-muted">Loading relationships...</p>';
@@ -339,47 +351,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 html += '</tbody></table>';
                 container.innerHTML = html;
-
-                // Re-bind preview buttons for newly rendered rows
-                container.querySelectorAll('button[data-action="preview-pair"]').forEach(bindPreviewPair);
+                bindPreviewButtons(container);
             })
             .catch(err => {
                 container.innerHTML = `<p class="text-danger">Failed to load relationships: ${err}</p>`;
             });
     }
 
-    function bindPreviewPair(button) {
-        button.addEventListener('click', async () => {
-            const geneId = button.dataset.geneId;
-            const strainId = button.dataset.strainId;
-
-            detailOutput.textContent = 'Loading...';
-            detailContainer.classList.remove('d-none');
-            detailColumn.classList.remove('d-none');
-
-            try {
-                const response = await fetch(`/pair/${encodeURIComponent(geneId)},${encodeURIComponent(strainId)}`);
-                if (!response.ok) {
-                    const text = await response.text();
-                    detailOutput.textContent = `Error ${response.status}: ${text}`;
-                    return;
-                }
-                const data = await response.json();
-                detailOutput.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                detailOutput.textContent = `Failed to fetch data: ${error}`;
-            }
-        });
-    }
-
-    // Preload relationships data on page load so it's ready when tab is clicked
-    relLoaded = true;
+    // Preload relationships
     loadRelationships('');
 
-    // Relationships search form
     document.getElementById('rel-search-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        relLoaded = true;
         const query = document.getElementById('rel-search-input').value.trim();
         loadRelationships(query);
     });

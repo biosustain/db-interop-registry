@@ -208,38 +208,11 @@ def api_relationships():
     })
 
 
-@bp.route("/databases", methods=["GET"])
-def databases():
-    """Page describing the collaborating databases."""
-    return render_template("databases.html")
-
-
-@bp.route("/", methods=["GET"])
-@swag_from(
-    {
-        "tags": ["Registry"],
-        "parameters": [
-            {
-                "in": "query",
-                "name": "q",
-                "schema": {"type": "string"},
-                "required": False,
-                "description": "Search term applied to UID or local ID.",
-            }
-        ],
-        "responses": {
-            200: {
-                "description": "HTML page containing registry mappings.",
-                "content": {"text/html": {"schema": {"type": "string"}}},
-            }
-        },
-    }
-)
-def index():
-    """Render the HTML view of available mappings and relationships."""
+@bp.route("/api/entities", methods=["GET"])
+def api_entities():
+    """Return entities as JSON for AJAX loading."""
     search_query = request.args.get("q", "").strip()
 
-    # === Entities Tab Data (from precomputed table_stats) ===
     stats_rows = db.session.execute(
         select(TableStats.table_name, TableStats.row_count)
         .where(TableStats.table_name.in_(["mapping", "mapping_gene", "mapping_strain"]))
@@ -248,6 +221,7 @@ def index():
     total_count = stats.get("mapping") or db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
     gene_count = stats.get("mapping_gene", 0)
     strain_count = stats.get("mapping_strain", 0)
+
     stmt = (
         select(
             Mapping,
@@ -266,7 +240,7 @@ def index():
 
     result = db.session.execute(stmt).all()
 
-    def _format_updated_at(dt):
+    def _fmt(dt):
         if dt is None:
             return "Unknown"
         if dt.tzinfo is None:
@@ -316,7 +290,6 @@ def index():
         for uid, local_id in parent_mappings:
             uid_to_local_ids.setdefault(uid, set()).add(local_id)
 
-    # Fetch entity URLs for the mappings
     entity_url_map: dict[tuple[str, int], list[str]] = {}
     if local_id_list:
         entity_url_rows = db.session.execute(
@@ -329,44 +302,77 @@ def index():
                 entity_url_map[key] = []
             entity_url_map[key].append(url)
 
-    mappings = [
-        {
-            "mapping": mapping,
-            "source_db_name": source_db_name,
+    entities = []
+    for mapping, source_db_name, entity_type_name in result:
+        synonyms = sorted(
+            {
+                *synonyms_by_uid.get(mapping.uid, set()),
+                *uid_to_local_ids.get(mapping.uid, set()),
+                *(
+                    {
+                        alt
+                        for parent_uid in synonym_to_parent_uids.get(mapping.local_id, set())
+                        for alt in (
+                            uid_to_local_ids.get(parent_uid, set())
+                            | synonyms_by_uid.get(parent_uid, set())
+                        )
+                    }
+                ),
+            }
+            - {mapping.local_id}
+        )
+        entities.append({
+            "uid": mapping.uid,
+            "local_id": mapping.local_id,
+            "entity_type_id": mapping.entity_type_id,
             "entity_type_name": entity_type_name,
-            "updated_at_display": _format_updated_at(mapping.updated_at),
+            "source_db_id": mapping.source_db_id,
+            "source_db_name": source_db_name,
+            "synonyms": synonyms,
             "entity_urls": entity_url_map.get((mapping.local_id, mapping.source_db_id), []),
-            "synonyms": sorted(
-                {
-                    *synonyms_by_uid.get(mapping.uid, set()),
-                    *uid_to_local_ids.get(mapping.uid, set()),
-                    *(
-                        {
-                            alt
-                            for parent_uid in synonym_to_parent_uids.get(mapping.local_id, set())
-                            for alt in (
-                                uid_to_local_ids.get(parent_uid, set())
-                                | synonyms_by_uid.get(parent_uid, set())
-                            )
-                        }
-                    ),
-                }
-                - {mapping.local_id}
-            ),
-        }
-        for mapping, source_db_name, entity_type_name in result
-    ]
+            "updated_at_display": _fmt(mapping.updated_at),
+        })
 
-    return render_template(
-        "mappings_list.html",
-        mappings=mappings,
-        search_query=search_query,
-        result_cap=1000,
-        total_count=total_count,
-        gene_count=gene_count,
-        strain_count=strain_count,
-        result_gene_count=result_entity_counts["gene"],
-        result_strain_count=result_entity_counts["strain"],
-    )
+    return jsonify({
+        "total": total_count,
+        "gene_count": gene_count,
+        "strain_count": strain_count,
+        "result_gene_count": result_entity_counts["gene"],
+        "result_strain_count": result_entity_counts["strain"],
+        "entities": entities,
+        "search_query": search_query,
+    })
+
+
+@bp.route("/databases", methods=["GET"])
+def databases():
+    """Page describing the collaborating databases."""
+    return render_template("databases.html")
+
+
+@bp.route("/", methods=["GET"])
+@swag_from(
+    {
+        "tags": ["Registry"],
+        "parameters": [
+            {
+                "in": "query",
+                "name": "q",
+                "schema": {"type": "string"},
+                "required": False,
+                "description": "Search term applied to UID or local ID.",
+            }
+        ],
+        "responses": {
+            200: {
+                "description": "HTML page containing registry mappings.",
+                "content": {"text/html": {"schema": {"type": "string"}}},
+            }
+        },
+    }
+)
+def index():
+    """Render the HTML shell; entity and relationship data loaded via AJAX."""
+    return render_template("mappings_list.html")
 
 
