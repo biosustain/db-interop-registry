@@ -14,8 +14,17 @@
         .db-card:hover {
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .db-card h5 {
+        .db-card-header {
+            display: flex;
+            align-items: center;
             margin-bottom: 0.75rem;
+        }
+        .db-logo {
+            height: 32px;
+            margin-right: 0.75rem;
+        }
+        .db-card h5 {
+            margin-bottom: 0;
         }
         .db-card h5 a {
             color: #212529;
@@ -27,6 +36,11 @@
         .db-card p {
             color: #6c757d;
             margin-bottom: 0.5rem;
+        }
+        .db-card-header .fa-external-link-alt {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-left: 0.4rem;
         }
         .db-card .badge {
             font-size: 0.75rem;
@@ -50,9 +64,12 @@
 </p>
 
 <div class="db-card">
-    <h5><a href="https://aledb.org" target="_blank">ALEdb <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <div class="db-card-header">
+        <a href="https://aledb.org" target="_blank"><img src="{{ url_for('static', filename='img/db-logos/aledb.png') }}" alt="ALEdb" class="db-logo"></a>
+        <a href="https://aledb.org" target="_blank"><i class="fas fa-external-link-alt fa-xs"></i></a>
+    </div>
     <p>
-        The Adaptive Laboratory Evolution Database. ALEdb reports acquired 
+        The Adaptive Laboratory Evolution Database. ALEdb reports acquired
         mutations and experimental conditions, supports mutation 
         cross-reference/search, exports, and includes a publication bibliome 
         across multiple model organisms.
@@ -63,12 +80,15 @@
 </div>
 
 <div class="db-card">
-    <h5><a href="https://biggr.org" target="_blank">BiGGr <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <div class="db-card-header">
+        <a href="https://biggr.org" target="_blank"><img src="{{ url_for('static', filename='img/db-logos/biggr.svg') }}" alt="BiGGr" class="db-logo"></a>
+        <a href="https://biggr.org" target="_blank"><i class="fas fa-external-link-alt fa-xs"></i></a>
+    </div>
     <p>
-        The Biochemical, Genetic and Genomic knowledgebase of large-scale
-        metabolic reconstructions. BiGGr hosts genome-scale metabolic models,
-        linking genes to metabolic reactions and enabling constraint-based
-        modeling of microbial metabolism.
+        BiGGr Models is a knowledgebase of genome-scale metabolic network 
+        reconstructions and an evolution of BiGG Models. BiGGr hosts 
+        genome-scale metabolic models, linking genes to metabolic reactions 
+        and enabling constraint-based modeling of microbial metabolism.
     </p>
     <span class="badge badge-genes me-1">Genes</span>
     <span class="badge badge-strains me-1">Strains</span>
@@ -76,12 +96,15 @@
 </div>
 
 <div class="db-card">
-    <h5><a href="https://pankb.org" target="_blank">PanKB <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <div class="db-card-header">
+        <a href="https://pankb.org" target="_blank"><img src="{{ url_for('static', filename='img/db-logos/pankb.svg') }}" alt="PanKB" class="db-logo"></a>
+        <a href="https://pankb.org" target="_blank"><i class="fas fa-external-link-alt fa-xs"></i></a>
+    </div>
     <p>
-        The Pangenome Knowledgebase. PanKB is an interactive microbial pangenome
+        The Pangenome Knowledge Base. PanKB is an interactive microbial pangenome
         knowledgebase with pangenome analytics, alleleomes, gene annotation
-        tables, phylogenetic views, global search, downloads, and a bibliome
-        of open-access pangenomic publications.
+        tables, phylogenetic views and a Retrieval-Augmented Generation function 
+        over a bibliome of open-access pangenomic publications.
     </p>
     <span class="badge badge-genes me-1">Genes</span>
     <span class="badge badge-strains me-1">Strains</span>
@@ -89,9 +112,11 @@
 </div>
 
 <div class="db-card">
-    <h5><a href="https://www.pmkbase.com" target="_blank">PMkbase <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    <div class="db-card-header">
+        <h5><a href="https://www.pmkbase.com" target="_blank">PMkbase <i class="fas fa-external-link-alt fa-xs"></i></a></h5>
+    </div>
     <p>
-        The Phenotype MicroArray Knowledgebase. PMMkbase is built on BiOLOG
+        The Phenotype MicroArray Knowledge Base. PMkbase is built on BiOLOG
         Phenotype MicroArray data, using a workflow of curation, quality check,
         kinetic parameter extraction, and growth/no-growth calls to track strain
         traits alongside sequences.
