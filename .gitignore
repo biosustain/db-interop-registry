@@ -363,3 +363,6 @@ docs/_build/
 
 # nohup
 *.out
+
+# json
+*.json

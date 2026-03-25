@@ -1,0 +1,246 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REST API &mdash; Interop DB Documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=e002afdd" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=01f34227"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Python Client" href="python-client.html" />
+    <link rel="prev" title="Data Model" href="data-model.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Interop DB
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="data-model.html">Data Model</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">REST API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#get-entity">Get Entity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#get-pair">Get Pair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#search-entities-ajax">Search Entities (AJAX)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#search-relationships-ajax">Search Relationships (AJAX)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="python-client.html">Python Client</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Interop DB</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">REST API</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rest-api">
+<h1>REST API<a class="headerlink" href="#rest-api" title="Link to this heading"></a></h1>
+<p>Base URL: <code class="docutils literal notranslate"><span class="pre">https://interopdb-staging-f-ca.salmonpebble-cac1724c.northeurope.azurecontainerapps.io</span></code></p>
+<p>Interactive documentation is available at <a class="reference external" href="https://interopdb-staging-f-ca.salmonpebble-cac1724c.northeurope.azurecontainerapps.io/apidocs/">/apidocs/</a>.</p>
+<section id="get-entity">
+<h2>Get Entity<a class="headerlink" href="#get-entity" title="Link to this heading"></a></h2>
+<p>Retrieve a gene or strain by local ID or UID.</p>
+<p><strong>Request</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">GET</span> <span class="o">/&lt;</span><span class="n">resource</span><span class="o">&gt;/&lt;</span><span class="n">identifier</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">resource</span></code>: <code class="docutils literal notranslate"><span class="pre">gene</span></code> or <code class="docutils literal notranslate"><span class="pre">strain</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">identifier</span></code>: Local ID (e.g. <code class="docutils literal notranslate"><span class="pre">rpoB</span></code>) or UID (e.g. <code class="docutils literal notranslate"><span class="pre">G-80D178D48AB8</span></code>)</p></li>
+</ul>
+<p><strong>Response</strong> (200):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;local_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rpoB&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;uid&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;G-80D178D48AB8&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;entity_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gene&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;attributes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source_db&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ALEdb&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;local_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rpoB&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source_db&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BiGGr&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;local_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;b3987&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Errors</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">400</span></code>: Invalid resource type</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">404</span></code>: Entity not found</p></li>
+</ul>
+<p><strong>Examples</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">curl</span> <span class="o">/</span><span class="n">gene</span><span class="o">/</span><span class="n">rpoB</span>
+<span class="n">curl</span> <span class="o">/</span><span class="n">strain</span><span class="o">/</span><span class="mi">511145</span>
+<span class="n">curl</span> <span class="o">/</span><span class="n">gene</span><span class="o">/</span><span class="n">G</span><span class="o">-</span><span class="mi">80</span><span class="n">D178D48AB8</span>
+</pre></div>
+</div>
+</section>
+<section id="get-pair">
+<h2>Get Pair<a class="headerlink" href="#get-pair" title="Link to this heading"></a></h2>
+<p>Query a gene-strain pair across all source databases.</p>
+<p><strong>Request</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">GET</span> <span class="o">/</span><span class="n">pair</span><span class="o">/&lt;</span><span class="n">gene_id</span><span class="o">&gt;</span><span class="p">,</span><span class="o">&lt;</span><span class="n">strain_id</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gene_id</span></code>: Gene local ID or UID</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">strain_id</span></code>: Strain local ID or UID</p></li>
+</ul>
+<p><strong>Response</strong> (200):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;gene&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rpoB&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;strain&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;511145&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sources&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;aledb&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;mutations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">&quot;count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;biggr&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pankb&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pmkbase&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Errors</strong>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">400</span></code>: Missing gene or strain identifier</p></li>
+</ul>
+<p><strong>Examples</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">curl</span> <span class="o">/</span><span class="n">pair</span><span class="o">/</span><span class="n">rpoB</span><span class="p">,</span><span class="mi">511145</span>
+<span class="n">curl</span> <span class="o">/</span><span class="n">pair</span><span class="o">/</span><span class="n">G</span><span class="o">-</span><span class="mi">80</span><span class="n">D178D48AB8</span><span class="p">,</span><span class="n">S</span><span class="o">-</span><span class="mi">6</span><span class="n">AC722234E99</span>
+</pre></div>
+</div>
+</section>
+<section id="search-entities-ajax">
+<h2>Search Entities (AJAX)<a class="headerlink" href="#search-entities-ajax" title="Link to this heading"></a></h2>
+<p><strong>Request</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET /api/entities?q=&lt;search_term&gt;
+</pre></div>
+</div>
+<p>Returns up to 200 entities matching the search term against local IDs,
+UIDs, and synonyms. Without <code class="docutils literal notranslate"><span class="pre">q</span></code>, returns the first 200 entities.</p>
+<p><strong>Response</strong> (200):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">400978</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;gene_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">355082</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;strain_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">45896</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;result_gene_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;result_strain_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;entities&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;search_query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rpoB&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="search-relationships-ajax">
+<h2>Search Relationships (AJAX)<a class="headerlink" href="#search-relationships-ajax" title="Link to this heading"></a></h2>
+<p><strong>Request</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET /api/relationships?q=&lt;search_term&gt;
+</pre></div>
+</div>
+<p>Returns up to 200 gene-strain relationships matching the search term.</p>
+<p><strong>Response</strong> (200):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">164067571</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;result_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;relationships&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;search_query&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rpoB&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data-model.html" class="btn btn-neutral float-left" title="Data Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="python-client.html" class="btn btn-neutral float-right" title="Python Client" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, SBRG.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

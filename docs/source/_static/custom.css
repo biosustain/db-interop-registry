@@ -1,0 +1,4 @@
+/* Hide "View page source" link */
+.wy-breadcrumbs-aside {
+    display: none;
+}

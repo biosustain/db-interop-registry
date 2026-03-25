@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/interopdb/__init__.py
+src/interopdb/cli.py
+src/interopdb/client.py
+src/interopdb.egg-info/PKG-INFO
+src/interopdb.egg-info/SOURCES.txt
+src/interopdb.egg-info/dependency_links.txt
+src/interopdb.egg-info/entry_points.txt
+src/interopdb.egg-info/requires.txt
+src/interopdb.egg-info/top_level.txt
+tests/test_client.py
