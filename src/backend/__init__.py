@@ -55,6 +55,7 @@ def create_app(config=None):
         SQLALCHEMY_DATABASE_URI=app.config.get("DATABASE_URI"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
+        JSON_SORT_KEYS=False,
     )
     if config:
         app.config.update(config)
