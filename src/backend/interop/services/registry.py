@@ -2,7 +2,11 @@ from sqlalchemy import or_
 
 from backend.interop.models import Entity, Mapping, Registry, SourceDb, Synonym
 from backend.interop.services.interop import InteropService
-from backend.interop.utils.exceptions import DatabaseInconsistencyError, InvalidResourceTypeError, ResourceNotFoundError
+from backend.interop.utils.exceptions import (
+    DatabaseInconsistencyError,
+    InvalidResourceTypeError,
+    ResourceNotFoundError,
+)
 
 
 class RegistryService:
@@ -10,7 +14,7 @@ class RegistryService:
 
     def __init__(self, db: any):
         self.db = db
-        self.interop_service = InteropService()
+        self.interop_service = InteropService
 
     def get_registry_item(self, resource: str, local_id_or_uid: str) -> dict:
         """
@@ -170,4 +174,5 @@ class RegistryService:
                 "Database inconsistency: mapping exists but no corresponding registry entry"
             )
 
+        return registry_entry
         return registry_entry
