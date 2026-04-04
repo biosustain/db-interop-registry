@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from sqlalchemy import tuple_
+from sqlalchemy import insert, tuple_, update
 from utils.db_connector import commit_with_retry, get_session
 from utils.models import AuditLog, Entity, Mapping, Registry, SourceDb, Synonym
 from utils.ncbi_assemblies import fetch_ncbi_assemblies, fetch_ncbi_gene_synonyms
@@ -274,13 +274,13 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             )
 
     if new_registry_rows:
-        session.bulk_insert_mappings(Registry, new_registry_rows)
+        session.execute(insert(Registry), new_registry_rows)
     if new_mapping_rows:
-        session.bulk_insert_mappings(Mapping, new_mapping_rows)
+        session.execute(insert(Mapping), new_mapping_rows)
     if new_audit_rows:
-        session.bulk_insert_mappings(AuditLog, new_audit_rows)
+        session.execute(insert(AuditLog), new_audit_rows)
     if mapping_updates:
-        session.bulk_update_mappings(Mapping, mapping_updates)
+        session.execute(update(Mapping), mapping_updates)
 
     synonym_uids = {payload["uid"] for payload in unique_payloads.values() if payload["synonyms"]}
     new_synonym_rows: list[dict[str, str]] = []
@@ -307,9 +307,9 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                 )
 
     if new_synonym_rows:
-        session.bulk_insert_mappings(Synonym, new_synonym_rows)
+        session.execute(insert(Synonym), new_synonym_rows)
     if new_synonym_audit_rows:
-        session.bulk_insert_mappings(AuditLog, new_synonym_audit_rows)
+        session.execute(insert(AuditLog), new_synonym_audit_rows)
 
     return len(unique_payloads), failures
 
