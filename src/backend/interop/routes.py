@@ -9,7 +9,16 @@ from sqlalchemy import or_, select, tuple_
 from backend import db
 from backend.interop import bp
 from backend.interop.enums import ResourceType
-from backend.interop.models import Entity, EntityUrl, GeneStrainRelationship, Mapping, RelationshipUrl, SourceDb, Synonym, TableStats
+from backend.interop.models import (
+    Entity,
+    EntityUrl,
+    GeneStrainRelationship,
+    Mapping,
+    RelationshipUrl,
+    SourceDb,
+    Synonym,
+    TableStats,
+)
 from backend.interop.services.registry import RegistryService
 
 SCHEMAS_DIR = Path(__file__).resolve().parent / "schemas"
@@ -135,7 +144,7 @@ def api_relationships():
         )
         .join(SourceDb, GeneStrainRelationship.source_db_id == SourceDb.id)
         .order_by(GeneStrainRelationship.gene_uid.asc())
-        .limit(1000)
+        .limit(200)
     )
 
     if search_query:
