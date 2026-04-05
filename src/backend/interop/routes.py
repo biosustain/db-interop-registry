@@ -270,11 +270,12 @@ def api_entities():
             dt = dt.replace(tzinfo=UTC)
         return dt.astimezone(UTC).strftime("%Y-%m-%d")
 
-    result_entity_counts = {"gene": 0, "strain": 0}
-    for mapping, source_db_name, entity_type_name in result:
-        entity_key = entity_type_name.lower()
-        if entity_key in result_entity_counts:
-            result_entity_counts[entity_key] += 1
+    if search_query:
+        result_entity_counts = {"gene": 0, "strain": 0}
+        for mapping, source_db_name, entity_type_name in result:
+            entity_key = entity_type_name.lower()
+            if entity_key in result_entity_counts:
+                result_entity_counts[entity_key] += 1
 
     uid_to_local_ids: dict[str, set[str]] = {}
     for mapping, _, _ in result:
