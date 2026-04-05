@@ -1,6 +1,0 @@
-httpx>=0.24
-click>=8.0
-
-[dev]
-pytest>=7.0
-pytest-httpx>=0.21
