@@ -251,7 +251,7 @@ def api_entities():
         )
         .join(SourceDb, Mapping.source_db_id == SourceDb.id)
         .join(Entity, Mapping.entity_type_id == Entity.id)
-        .order_by(Mapping.local_id.asc())
+        .order_by(Entity.name.desc(), Mapping.local_id.asc())
         .limit(200)
     )
 
