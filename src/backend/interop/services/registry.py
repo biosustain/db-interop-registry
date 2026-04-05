@@ -175,4 +175,3 @@ class RegistryService:
             )
 
         return registry_entry
-        return registry_entry
