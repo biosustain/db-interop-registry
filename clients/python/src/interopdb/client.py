@@ -38,7 +38,7 @@ class InteropClient:
         """Query a gene by local ID or UID.
 
         Args:
-            identifier: Gene local ID (e.g. ``"rpoB"``) or UID (e.g. ``"G-80D178D48AB8"``).
+            identifier: Gene local ID (e.g. ``"rpoB"``) or UID (e.g. ``"G-6EE9A9CD8006"``).
 
         Returns:
             Registry item with ``local_id``, ``uid``, ``entity_type``, and ``attributes`` from all source databases.

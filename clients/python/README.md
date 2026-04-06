@@ -2,10 +2,17 @@
 
 Python client and CLI for the [Interop DB Registry](https://interopdb-staging-f-ca.salmonpebble-cac1724c.northeurope.azurecontainerapps.io/) API.
 
+Interop DB is a federated registry that assigns unified identifiers to genes and strains across multiple biological databases, enabling cross-database queries with a single search. It integrates data from:
+
+- **ALEdb** -- Adaptive Laboratory Evolution Database 
+- **BiGGr** -- Knowledgebase of genome-scale metabolic network reconstructions
+- **PanKB** -- Pangenome Knowledge Base (genes, strains, pangenomics)
+- **PMkbase** -- Phenotype MicroArray Knowledge Base (strains, phenotypes)
+
 ## Installation
 
 ```bash
-pip install -e clients/python/
+pip install interopdb
 ```
 
 ## Python API
@@ -31,12 +38,6 @@ for source in result["sources"]:
 client.save_json(result, "output.json")
 ```
 
-Use a custom server URL:
-
-```python
-client = InteropClient(base_url="http://localhost:50505")
-```
-
 ## CLI
 
 ```bash
@@ -49,18 +50,4 @@ interopdb pair rpoB 511145
 
 # Save to file
 interopdb gene rpoB -o result.json
-
-# Use a custom server
-interopdb --url http://localhost:50505 gene rpoB
-
-# Or set via environment variable
-export INTEROPDB_URL=http://localhost:50505
-interopdb gene rpoB
-```
-
-## Development
-
-```bash
-pip install -e "clients/python/[dev]"
-cd clients/python && python -m pytest
 ```

@@ -4,12 +4,11 @@ import json
 import sys
 
 import click
-
 from interopdb.client import DEFAULT_BASE_URL, InteropClient, InteropError
 
 
 @click.group()
-@click.option("--url", default=DEFAULT_BASE_URL, envvar="INTEROPDB_URL", show_default=True, help="Interop DB server URL.")
+@click.option("--url", default=DEFAULT_BASE_URL, show_default=True, help="Interop DB server URL.")
 @click.pass_context
 def cli(ctx, url):
     """Query the Interop DB Registry."""
