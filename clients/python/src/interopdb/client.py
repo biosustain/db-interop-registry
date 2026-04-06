@@ -68,6 +68,45 @@ class InteropClient:
         """
         return self._get(f"/pair/{gene_id},{strain_id}")
 
+    def search_entities(self, query: str = "") -> dict:
+        """Search entities by local ID, UID, or synonym.
+
+        Args:
+            query: Search term (e.g. ``"dnaA"``). Empty string returns default results.
+                   Returns up to 200 matching results.
+
+        Returns:
+            Dictionary with ``entities`` list, ``total`` (registry total),
+            ``gene_count``, ``strain_count``, and when searching,
+            ``result_gene_count`` and ``result_strain_count``.
+        """
+        params = {"q": query} if query else {}
+        response = self._client.get("/api/entities", params=params)
+        if response.status_code == 200:
+            return response.json()
+        detail = response.text or response.reason_phrase
+        raise InteropError(response.status_code, detail)
+
+    def search_relationships(self, query: str = "") -> dict:
+        """Search gene-strain relationships by a single entity's local ID or UID.
+
+        For example, search by a gene to find all related strains, or by a strain
+        to find all related genes.
+
+        Args:
+            query: A gene or strain local ID or UID (e.g. ``"rpoB"`` or ``"511145"``).
+                   Empty string returns default results. Returns up to 200 matching results.
+
+        Returns:
+            Dictionary with ``relationships`` list and ``total`` (registry total).
+        """
+        params = {"q": query} if query else {}
+        response = self._client.get("/api/relationships", params=params)
+        if response.status_code == 200:
+            return response.json()
+        detail = response.text or response.reason_phrase
+        raise InteropError(response.status_code, detail)
+
     def _get(self, path: str) -> dict:
         response = self._client.get(path)
         if response.status_code == 200:
