@@ -361,6 +361,7 @@ docs/_build/
 # Python package build artifacts
 *.egg-info/
 clients/**/build/
+clients/**/dist/
 
 # MacOS Specific
 **/.DS_Store
