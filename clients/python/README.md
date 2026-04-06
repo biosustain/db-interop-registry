@@ -67,3 +67,12 @@ interopdb search-relationships GCF_031662355.1
 # Save to file
 interopdb gene rpoB -o result.json
 ```
+
+## Changelog
+
+### 0.2.0
+- Add `search_entities()` and `search_relationships()` to Python API
+- Add `search-entities` and `search-relationships` CLI commands
+
+### 0.1.0
+- Initial release with `get_gene`, `get_strain`, `get_pair` Python API and CLI
