@@ -4,10 +4,10 @@ Python client and CLI for the [Interop DB Registry](https://interopdb-staging-f-
 
 Interop DB is a federated registry that assigns unified identifiers to genes and strains across multiple biological databases, enabling cross-database queries with a single search. It integrates data from:
 
-- **ALEdb** -- Adaptive Laboratory Evolution Database 
-- **BiGGr** -- Knowledgebase of genome-scale metabolic network reconstructions
-- **PanKB** -- Pangenome Knowledge Base (genes, strains, pangenomics)
-- **PMkbase** -- Phenotype MicroArray Knowledge Base (strains, phenotypes)
+- **[ALEdb](https://aledb.org)** -- Adaptive Laboratory Evolution Database 
+- **[BiGGr](https://biggr.org)** -- Knowledgebase of genome-scale metabolic network reconstructions
+- **[PanKB](https://pankb.org)** -- Pangenome Knowledge Base
+- **[PMkbase](https://www.pmkbase.com)** -- Phenotype MicroArray Knowledge Base
 
 ## Installation
 
