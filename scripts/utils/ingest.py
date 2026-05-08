@@ -7,8 +7,8 @@ import sys
 import time
 from pathlib import Path
 
-from sqlalchemy import tuple_
-from utils.db_connector import get_session
+from sqlalchemy import insert, tuple_, update
+from utils.db_connector import commit_with_retry, get_session
 from utils.models import AuditLog, Entity, Mapping, Registry, SourceDb, Synonym
 from utils.ncbi_assemblies import fetch_ncbi_assemblies, fetch_ncbi_gene_synonyms
 from utils.uniprot import fetch_uniprot_id
@@ -47,7 +47,7 @@ def generate_uid(entity_type: str, local_id: str) -> str:
     """
     # Create a deterministic hash from the local_id
     hash_input = f"{entity_type}:{local_id}".encode()
-    hash_digest = hashlib.sha256(hash_input).hexdigest()[:8]
+    hash_digest = hashlib.sha256(hash_input).hexdigest()[:12]
 
     # Add appropriate prefix
     prefix = "G-" if entity_type.lower() == "gene" else "S-"
@@ -123,50 +123,52 @@ def get_entity_type_id(db_session, entity_type: str, cache: dict[str, int] | Non
     return entity.id
 
 
+def _normalize_synonyms(raw) -> set[str]:
+    """Normalize synonyms from various formats into a set of clean strings."""
+    if not raw:
+        return set()
+    if isinstance(raw, str):
+        return {raw.strip()} if raw.strip() else set()
+    if isinstance(raw, list):
+        result = set()
+        for s in raw:
+            if s is None:
+                continue
+            cleaned = (s if isinstance(s, str) else str(s)).strip()
+            if cleaned:
+                result.add(cleaned)
+        return result
+    raise ValueError("Synonyms must be a string or a list of strings")
+
+
+def _fetch_external_synonyms(
+    *,
+    has_gene_lookup: bool,
+    source_db_name: str,
+    entity_type: str,
+    local_id: str,
+    strain_id: str | None,
+) -> set[str]:
+    if has_gene_lookup and strain_id is not None:
+        return set(fetch_ncbi_gene_synonyms(local_id, strain_id)) | set(fetch_uniprot_id(local_id, strain_id))
+
+    if entity_type == "strain" and source_db_name.lower() == "aledb":
+        print(f"Fetching NCBI assemblies for strain {local_id}...")
+        ncbi_results = list(fetch_ncbi_assemblies(local_id))
+        print(f"Found {len(ncbi_results)} assemblies for strain {local_id}.")
+        return set(ncbi_results)
+    return set()
+
+
 def _process_batch(session, batch, source_db_cache, entity_type_cache):
     """Process a batch, returning (successful_count, failed_count)."""
-    prepared = []
+    unique_payloads: dict[tuple[int, int, str], dict] = {}
     failures = 0
-
-    def _merge_synonym_values(existing, fetched):
-        if not fetched:
-            return existing
-        if existing is None:
-            return fetched
-        if isinstance(existing, list):
-            return existing + fetched
-        return [existing, *fetched]
-
-    def _fetch_external_synonyms(
-        *,
-        has_gene_lookup: bool,
-        source_db_name: str,
-        entity_type: str,
-        local_id: str,
-        strain_id: str | None,
-    ) -> list[str]:
-        if has_gene_lookup and strain_id is not None:
-            ncbi_results = fetch_ncbi_gene_synonyms(local_id, strain_id)
-            uniprot_results = fetch_uniprot_id(local_id, strain_id)
-
-            return list(ncbi_results) + list(uniprot_results)
-
-        source_db_normalized = source_db_name.lower()
-        should_fetch_assemblies = entity_type == "strain" and source_db_normalized == "aledb"
-        if should_fetch_assemblies:
-            print(f"Fetching NCBI assemblies for strain {local_id}...")
-            ncbi_results = list(fetch_ncbi_assemblies(local_id))
-            print(f"Found {len(ncbi_results)} assemblies for strain {local_id}.")
-            return ncbi_results
-        return []
 
     for idx, entity in batch:
         try:
             has_gene_lookup = "gene_id" in entity and "strain_id" in entity
-            if has_gene_lookup:
-                required_fields = ["source_db", "gene_id", "strain_id"]
-            else:
-                required_fields = ["source_db", "entity_type", "local_id"]
+            required_fields = ["source_db", "gene_id", "strain_id"] if has_gene_lookup else ["source_db", "entity_type", "local_id"]
             for field in required_fields:
                 if field not in entity:
                     raise ValueError(f"Missing required field: {field}")
@@ -185,78 +187,45 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             entity_type_id = get_entity_type_id(session, entity_type, cache=entity_type_cache)
             uid = generate_uid(entity_type, local_id)
 
-            raw_synonyms = entity.get("synonyms", [])
-            fetched_synonyms = _fetch_external_synonyms(
+            synonyms = _normalize_synonyms(entity.get("synonyms")) | _fetch_external_synonyms(
                 has_gene_lookup=has_gene_lookup,
                 source_db_name=source_db_name,
                 entity_type=entity_type,
                 local_id=local_id,
                 strain_id=strain_id,
             )
-            raw_synonyms = _merge_synonym_values(raw_synonyms, fetched_synonyms)
-            if raw_synonyms is None:
-                synonyms: list[str] = []
-            elif isinstance(raw_synonyms, str):
-                synonyms = [raw_synonyms.strip()] if raw_synonyms.strip() else []
-            elif isinstance(raw_synonyms, list):
-                synonyms = []
-                for synonym in raw_synonyms:
-                    if synonym is None:
-                        continue
-                    if not isinstance(synonym, str):
-                        synonym = str(synonym)
-                    cleaned = synonym.strip()
-                    if cleaned:
-                        synonyms.append(cleaned)
-            else:
-                raise ValueError("Synonyms must be a string or a list of strings")
 
-            prepared.append(
-                {
-                    "index": idx,
+            key = (source_db_id, entity_type_id, local_id)
+            if key in unique_payloads:
+                unique_payloads[key]["synonyms"].update(synonyms)
+            else:
+                unique_payloads[key] = {
                     "source_db_id": source_db_id,
                     "entity_type_id": entity_type_id,
                     "local_id": local_id,
                     "uid": uid,
                     "synonyms": synonyms,
                 }
-            )
         except Exception as exc:
             print(f"Error processing entity {idx}: {exc}")
             failures += 1
 
-    if not prepared:
+    if not unique_payloads:
         return 0, failures
 
-    unique_payloads: dict[tuple[int, int, str], dict] = {}
-    for item in prepared:
-        key = (item["source_db_id"], item["entity_type_id"], item["local_id"])
-        synonyms = set(item.get("synonyms", []))
-        if key in unique_payloads:
-            unique_payloads[key]["synonyms"].update(synonyms)
-        else:
-            dedup_item = dict(item)
-            dedup_item["synonyms"] = synonyms
-            unique_payloads[key] = dedup_item
-
     keys = list(unique_payloads.keys())
-
-    existing_mappings = {}
-    existing_registries = {}
-    if keys:
-        existing_mappings = {
-            (m.source_db_id, m.entity_type_id, m.local_id): m
-            for m in session.query(Mapping).filter(
-                tuple_(Mapping.source_db_id, Mapping.entity_type_id, Mapping.local_id).in_(keys)
-            )  # type: ignore[arg-type]
-        }
-
-        existing_registries = {
-            (r.source_db_id, r.entity_type_id, r.local_id): r
-            for r in session.query(Registry).filter(
-                tuple_(Registry.source_db_id, Registry.entity_type_id, Registry.local_id).in_(keys)
-            )  # type: ignore[arg-type]
-        }
+    existing_mappings = {
+        (m.source_db_id, m.entity_type_id, m.local_id): m
+        for m in session.query(Mapping).filter(
+            tuple_(Mapping.source_db_id, Mapping.entity_type_id, Mapping.local_id).in_(keys)
+        )  # type: ignore[arg-type]
+    }
+    existing_registries = {
+        (r.source_db_id, r.entity_type_id, r.local_id): r
+        for r in session.query(Registry).filter(
+            tuple_(Registry.source_db_id, Registry.entity_type_id, Registry.local_id).in_(keys)
+        )  # type: ignore[arg-type]
+    }
 
     now = datetime.datetime.utcnow()
     new_registry_rows: list[dict] = []
@@ -305,13 +274,13 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
             )
 
     if new_registry_rows:
-        session.bulk_insert_mappings(Registry, new_registry_rows)
+        session.execute(insert(Registry), new_registry_rows)
     if new_mapping_rows:
-        session.bulk_insert_mappings(Mapping, new_mapping_rows)
+        session.execute(insert(Mapping), new_mapping_rows)
     if new_audit_rows:
-        session.bulk_insert_mappings(AuditLog, new_audit_rows)
+        session.execute(insert(AuditLog), new_audit_rows)
     if mapping_updates:
-        session.bulk_update_mappings(Mapping, mapping_updates)
+        session.execute(update(Mapping), mapping_updates)
 
     synonym_uids = {payload["uid"] for payload in unique_payloads.values() if payload["synonyms"]}
     new_synonym_rows: list[dict[str, str]] = []
@@ -338,11 +307,11 @@ def _process_batch(session, batch, source_db_cache, entity_type_cache):
                 )
 
     if new_synonym_rows:
-        session.bulk_insert_mappings(Synonym, new_synonym_rows)
+        session.execute(insert(Synonym), new_synonym_rows)
     if new_synonym_audit_rows:
-        session.bulk_insert_mappings(AuditLog, new_synonym_audit_rows)
+        session.execute(insert(AuditLog), new_synonym_audit_rows)
 
-    return len(prepared), failures
+    return len(unique_payloads), failures
 
 
 def start_ingest(session, entities: list[dict], chunk_size: int = BATCH_SIZE) -> None:
@@ -359,26 +328,14 @@ def start_ingest(session, entities: list[dict], chunk_size: int = BATCH_SIZE) ->
 
         if len(batch) >= chunk_size:
             success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
-            try:
-                session.commit()
-            except Exception:
-                session.rollback()
-                raise
+            commit_with_retry(session)
             successful_ingests += success
             failed_ingests += failure
             batch.clear()
 
-            processed = successful_ingests + failed_ingests
-            if processed % 1_000 == 0:
-                print(f"Processed {processed} entities... Successful: {successful_ingests}, Failed: {failed_ingests}")
-
     if batch:
         success, failure = _process_batch(session, batch, source_db_cache, entity_type_cache)
-        try:
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
+        commit_with_retry(session)
         successful_ingests += success
         failed_ingests += failure
 

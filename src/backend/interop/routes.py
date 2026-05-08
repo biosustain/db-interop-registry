@@ -3,13 +3,22 @@ from datetime import UTC
 from pathlib import Path
 
 from flasgger import swag_from
-from flask import jsonify, render_template, request
-from sqlalchemy import or_, select
+from flask import jsonify, make_response, render_template, request
+from sqlalchemy import or_, select, tuple_
 
 from backend import db
 from backend.interop import bp
 from backend.interop.enums import ResourceType
-from backend.interop.models import Entity, Mapping, SourceDb, Synonym
+from backend.interop.models import (
+    Entity,
+    EntityUrl,
+    GeneStrainRelationship,
+    Mapping,
+    RelationshipUrl,
+    SourceDb,
+    Synonym,
+    TableStats,
+)
 from backend.interop.services.registry import RegistryService
 
 SCHEMAS_DIR = Path(__file__).resolve().parent / "schemas"
@@ -115,39 +124,125 @@ def get_registry_pair(pair_identifiers: str):
     return jsonify(result), 200
 
 
-@bp.route("/", methods=["GET"])
-@swag_from(
-    {
-        "tags": ["Registry"],
-        "parameters": [
-            {
-                "in": "query",
-                "name": "q",
-                "schema": {"type": "string"},
-                "required": False,
-                "description": "Search term applied to UID or local ID.",
-            }
-        ],
-        "responses": {
-            200: {
-                "description": "HTML page containing registry mappings.",
-                "content": {"text/html": {"schema": {"type": "string"}}},
-            }
-        },
-    }
-)
-def index():
-    """Render the HTML view of available mappings."""
+@bp.route("/api/relationships", methods=["GET"])
+def api_relationships():
+    """Return relationships as JSON for AJAX loading."""
     search_query = request.args.get("q", "").strip()
-    total_count = db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
-    entity_counts_result = db.session.execute(
-        select(Entity.name, db.func.count(Mapping.uid))
-        .join(Mapping, Mapping.entity_type_id == Entity.id)
-        .group_by(Entity.name)
+
+    cached = db.session.execute(
+        select(TableStats.row_count).where(TableStats.table_name == "gene_strain_relationship")
+    ).scalar_one_or_none()
+    total_relationships = cached if cached is not None else 0
+
+    rel_stmt = (
+        select(
+            GeneStrainRelationship.gene_uid,
+            GeneStrainRelationship.strain_uid,
+            GeneStrainRelationship.source_db_id,
+            GeneStrainRelationship.updated_at,
+            SourceDb.db_name.label("source_db_name"),
+        )
+        .join(SourceDb, GeneStrainRelationship.source_db_id == SourceDb.id)
+        .order_by(GeneStrainRelationship.gene_uid.asc())
+        .limit(200)
+    )
+
+    if search_query:
+        like_value = f"%{search_query}%"
+        # Resolve search term to UIDs via mapping table (small & indexed)
+        matching_uids = db.session.execute(
+            select(Mapping.uid).where(
+                or_(Mapping.local_id.ilike(like_value), Mapping.uid.ilike(like_value))
+            )
+        ).scalars().all()
+
+        # Also check synonyms
+        synonym_uids = db.session.execute(
+            select(Synonym.uid).where(Synonym.synonym.ilike(like_value))
+        ).scalars().all()
+
+        all_matched_uids = list(set(matching_uids + synonym_uids))
+
+        if not all_matched_uids:
+            rel_result = []
+        else:
+            # Use exact IN matches on indexed UID columns (fast)
+            rel_stmt = rel_stmt.where(or_(
+                GeneStrainRelationship.gene_uid.in_(all_matched_uids),
+                GeneStrainRelationship.strain_uid.in_(all_matched_uids)
+            ))
+            rel_result = db.session.execute(rel_stmt).all()
+    else:
+        rel_result = db.session.execute(rel_stmt).all()
+
+    all_uids = {r.gene_uid for r in rel_result} | {r.strain_uid for r in rel_result}
+    uid_to_local: dict[str, str] = {}
+    if all_uids:
+        rows = db.session.execute(
+            select(Mapping.uid, Mapping.local_id).where(Mapping.uid.in_(all_uids))
+        ).all()
+        for uid, local_id in rows:
+            uid_to_local[uid] = local_id
+
+    rel_keys = [(r.gene_uid, r.strain_uid, r.source_db_id) for r in rel_result]
+    rel_url_map: dict[tuple[str, str, int], list[str]] = {}
+    if rel_keys:
+        rel_url_rows = db.session.execute(
+            select(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id, RelationshipUrl.url)
+            .where(
+                tuple_(RelationshipUrl.gene_uid, RelationshipUrl.strain_uid, RelationshipUrl.source_db_id).in_(rel_keys)
+            )
+        ).all()
+        for gene_uid, strain_uid, source_db_id, url in rel_url_rows:
+            key = (gene_uid, strain_uid, source_db_id)
+            if key not in rel_url_map:
+                rel_url_map[key] = []
+            rel_url_map[key].append(url)
+
+    def _fmt(dt):
+        if dt is None:
+            return "Unknown"
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC).strftime("%Y-%m-%d")
+
+    relationships = [
+        {
+            "gene_uid": r.gene_uid,
+            "gene_local_id": uid_to_local.get(r.gene_uid, ""),
+            "strain_uid": r.strain_uid,
+            "strain_local_id": uid_to_local.get(r.strain_uid, ""),
+            "source_db_name": r.source_db_name,
+            "urls": rel_url_map.get((r.gene_uid, r.strain_uid, r.source_db_id), []),
+            "updated_at_display": _fmt(r.updated_at),
+        }
+        for r in rel_result
+    ]
+
+    resp = make_response(jsonify({
+        "total": total_relationships,
+        "relationships": relationships,
+        "search_query": search_query,
+    }))
+    if not search_query:
+        resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
+@bp.route("/api/entities", methods=["GET"])
+def api_entities():
+    """Return entities as JSON for AJAX loading."""
+    search_query = request.args.get("q", "").strip()
+
+    stats_rows = db.session.execute(
+        select(TableStats.table_name, TableStats.row_count)
+        .where(TableStats.table_name.in_(["mapping", "mapping_gene", "mapping_strain"]))
     ).all()
-    entity_counts = {name.lower(): count for name, count in entity_counts_result}
-    gene_count = entity_counts.get("gene", 0)
-    strain_count = entity_counts.get("strain", 0)
+    stats = {name: count for name, count in stats_rows}
+    total_count = stats.get("mapping") or db.session.execute(select(db.func.count()).select_from(Mapping)).scalar_one()
+    gene_count = stats.get("mapping_gene", 0)
+    strain_count = stats.get("mapping_strain", 0)
+
     stmt = (
         select(
             Mapping,
@@ -156,28 +251,40 @@ def index():
         )
         .join(SourceDb, Mapping.source_db_id == SourceDb.id)
         .join(Entity, Mapping.entity_type_id == Entity.id)
-        .order_by(Mapping.updated_at.desc())
-        .limit(1000)
+        .order_by(Entity.name.desc(), Mapping.local_id.asc())
+        .limit(200)
     )
 
     if search_query:
         like_value = f"%{search_query}%"
-        stmt = stmt.where(or_(Mapping.uid.ilike(like_value), Mapping.local_id.ilike(like_value)))
+        # Find UIDs whose synonyms match the search query
+        matching_uids_via_synonym = db.session.execute(
+            select(Synonym.uid).where(Synonym.synonym.ilike(like_value))
+        ).scalars().all()
+
+        conditions = [
+            Mapping.uid.ilike(like_value),
+            Mapping.local_id.ilike(like_value),
+        ]
+        if matching_uids_via_synonym:
+            conditions.append(Mapping.uid.in_(matching_uids_via_synonym))
+        stmt = stmt.where(or_(*conditions))
 
     result = db.session.execute(stmt).all()
 
-    def _format_updated_at(dt):
+    def _fmt(dt):
         if dt is None:
             return "Unknown"
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
-        return dt.astimezone(UTC).strftime("%b %d, %Y %H:%M UTC")
+        return dt.astimezone(UTC).strftime("%Y-%m-%d")
 
     result_entity_counts = {"gene": 0, "strain": 0}
-    for mapping, source_db_name, entity_type_name in result:
-        entity_key = entity_type_name.lower()
-        if entity_key in result_entity_counts:
-            result_entity_counts[entity_key] += 1
+    if search_query:
+        for mapping, source_db_name, entity_type_name in result:
+            entity_key = entity_type_name.lower()
+            if entity_key in result_entity_counts:
+                result_entity_counts[entity_key] += 1
 
     uid_to_local_ids: dict[str, set[str]] = {}
     for mapping, _, _ in result:
@@ -216,40 +323,92 @@ def index():
         for uid, local_id in parent_mappings:
             uid_to_local_ids.setdefault(uid, set()).add(local_id)
 
-    mappings = [
-        {
-            "mapping": mapping,
-            "source_db_name": source_db_name,
+    entity_url_map: dict[tuple[str, int], list[str]] = {}
+    if local_id_list:
+        entity_url_rows = db.session.execute(
+            select(EntityUrl.local_id, EntityUrl.source_db_id, EntityUrl.url)
+            .where(EntityUrl.local_id.in_(local_id_list))
+        ).all()
+        for local_id, source_db_id, url in entity_url_rows:
+            key = (local_id, source_db_id)
+            if key not in entity_url_map:
+                entity_url_map[key] = []
+            entity_url_map[key].append(url)
+
+    entities = []
+    for mapping, source_db_name, entity_type_name in result:
+        synonyms = sorted(
+            {
+                *synonyms_by_uid.get(mapping.uid, set()),
+                *uid_to_local_ids.get(mapping.uid, set()),
+                *(
+                    {
+                        alt
+                        for parent_uid in synonym_to_parent_uids.get(mapping.local_id, set())
+                        for alt in (
+                            uid_to_local_ids.get(parent_uid, set())
+                            | synonyms_by_uid.get(parent_uid, set())
+                        )
+                    }
+                ),
+            }
+            - {mapping.local_id}
+        )
+        entities.append({
+            "uid": mapping.uid,
+            "local_id": mapping.local_id,
+            "entity_type_id": mapping.entity_type_id,
             "entity_type_name": entity_type_name,
-            "updated_at_display": _format_updated_at(mapping.updated_at),
-            "synonyms": sorted(
-                {
-                    *synonyms_by_uid.get(mapping.uid, set()),
-                    *uid_to_local_ids.get(mapping.uid, set()),
-                    *(
-                        {
-                            alt
-                            for parent_uid in synonym_to_parent_uids.get(mapping.local_id, set())
-                            for alt in (
-                                uid_to_local_ids.get(parent_uid, set())
-                                | synonyms_by_uid.get(parent_uid, set())
-                            )
-                        }
-                    ),
-                }
-                - {mapping.local_id}
-            ),
-        }
-        for mapping, source_db_name, entity_type_name in result
-    ]
-    return render_template(
-        "mappings_list.html",
-        mappings=mappings,
-        search_query=search_query,
-        result_cap=1000,
-        total_count=total_count,
-        gene_count=gene_count,
-        strain_count=strain_count,
-        result_gene_count=result_entity_counts["gene"],
-        result_strain_count=result_entity_counts["strain"],
-    )
+            "source_db_id": mapping.source_db_id,
+            "source_db_name": source_db_name,
+            "synonyms": synonyms,
+            "entity_urls": entity_url_map.get((mapping.local_id, mapping.source_db_id), []),
+            "updated_at_display": _fmt(mapping.updated_at),
+        })
+
+    resp = make_response(jsonify({
+        "total": total_count,
+        "gene_count": gene_count,
+        "strain_count": strain_count,
+        "result_gene_count": result_entity_counts["gene"],
+        "result_strain_count": result_entity_counts["strain"],
+        "entities": entities,
+        "search_query": search_query,
+    }))
+    if not search_query:
+        resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
+@bp.route("/databases", methods=["GET"])
+def databases():
+    """Page describing the collaborating databases."""
+    return render_template("databases.html")
+
+
+@bp.route("/", methods=["GET"])
+@swag_from(
+    {
+        "tags": ["Registry"],
+        "parameters": [
+            {
+                "in": "query",
+                "name": "q",
+                "schema": {"type": "string"},
+                "required": False,
+                "description": "Search term applied to UID or local ID.",
+            }
+        ],
+        "responses": {
+            200: {
+                "description": "HTML page containing registry mappings.",
+                "content": {"text/html": {"schema": {"type": "string"}}},
+            }
+        },
+    }
+)
+def index():
+    """Render the HTML shell; entity and relationship data loaded via AJAX."""
+    return render_template("mappings_list.html")
+
+

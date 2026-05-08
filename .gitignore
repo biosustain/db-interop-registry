@@ -358,5 +358,16 @@ venv
 # Sphinx build artifacts
 docs/_build/
 
+# Python package build artifacts
+*.egg-info/
+clients/**/build/
+clients/**/dist/
+
 # MacOS Specific
 **/.DS_Store
+
+# nohup
+*.out
+
+# json
+*.json

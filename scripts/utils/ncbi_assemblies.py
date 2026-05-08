@@ -1,5 +1,7 @@
 """Helpers for working with NCBI data."""
 
+import os
+import time
 from functools import lru_cache
 
 import httpx
@@ -7,16 +9,42 @@ import httpx
 NCBI_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 NCBI_ESEARCH_URL = f"{NCBI_BASE_URL}/esearch.fcgi"
 NCBI_ESUMMARY_URL = f"{NCBI_BASE_URL}/esummary.fcgi"
-NCBI_ASSEMBLY_TERM = "txid{local_id}[Organism:noexp]"
+NCBI_API_KEY = os.getenv("NCBI_API_KEY", "")
+NCBI_REQUEST_INTERVAL = 0.15  # seconds between requests (10/sec with API key, keep margin)
+NCBI_ASSEMBLY_TERM = (
+    'txid{local_id}[Organism:noexp]'
+    ' AND "latest refseq"[filter]'
+    ' AND "complete genome"[filter]'
+)
 NCBI_TIMEOUT = 30.0
 ESEARCH_PAGE_SIZE = 500  # IDs returned per search page
 ESUMMARY_BATCH_SIZE = 200  # IDs resolved to accession strings per call
+MAX_RETRIES = 3  # retry count for 429 responses
+
+
+def _ncbi_get(client: httpx.Client, url: str, params: dict) -> httpx.Response:
+    """Rate-limited GET with automatic 429 retry and backoff."""
+    if NCBI_API_KEY:
+        params = {**params, "api_key": NCBI_API_KEY}
+    for attempt in range(MAX_RETRIES):
+        time.sleep(NCBI_REQUEST_INTERVAL)
+        resp = client.get(url, params=params)
+        if resp.status_code != 429:
+            resp.raise_for_status()
+            return resp
+        wait = 1.0 * (2 ** attempt)
+        print(f"NCBI 429 rate limited, retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES})...")
+        time.sleep(wait)
+    resp.raise_for_status()
+    return resp  # unreachable but satisfies type checker
 
 
 @lru_cache(maxsize=2048)
 def fetch_ncbi_assemblies(local_id: str) -> tuple[str, ...]:
     """
-    Fetch Assembly Accessions (GCF_..., GCA_...) for a taxonomy ID by searching db=assembly.
+    Fetch Assembly Accessions for a taxonomy ID from NCBI.
+
+    Filters to latest RefSeq + complete genome only.
     """
     local_id_str = str(local_id).strip()
     if not local_id_str:
@@ -41,8 +69,7 @@ def fetch_ncbi_assemblies(local_id: str) -> tuple[str, ...]:
 
                 query_params = search_params | {"retmax": retmax, "retstart": retstart}
 
-                resp = client.get(NCBI_ESEARCH_URL, params=query_params)
-                resp.raise_for_status()
+                resp = _ncbi_get(client, NCBI_ESEARCH_URL, query_params)
 
                 try:
                     payload = resp.json()
@@ -79,8 +106,7 @@ def fetch_ncbi_assemblies(local_id: str) -> tuple[str, ...]:
                     "id": ids_str,
                 }
 
-                resp = client.get(NCBI_ESUMMARY_URL, params=summary_params)
-                resp.raise_for_status()
+                resp = _ncbi_get(client, NCBI_ESUMMARY_URL, summary_params)
 
                 summary_data = resp.json()
                 result_data = summary_data.get("result", {})
@@ -115,8 +141,7 @@ def fetch_ncbi_gene_synonyms(gene_id: str, strain_id: str) -> tuple[str, ...]:
 
     try:
         with httpx.Client(timeout=NCBI_TIMEOUT) as client:
-            resp = client.get(NCBI_ESEARCH_URL, params=search_params)
-            resp.raise_for_status()
+            resp = _ncbi_get(client, NCBI_ESEARCH_URL, search_params)
             payload = resp.json()
     except httpx.HTTPError as exc:
         print(

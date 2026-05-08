@@ -56,13 +56,13 @@ module postgresServer 'core/database/postgresql/flexibleserver.bicep' = {
     location: location
     tags: tags
     sku: {
-      name: 'Standard_B1ms'
-      tier: 'Burstable'
+      name: 'Standard_D2s_v3'
+      tier: 'GeneralPurpose'
     }
     storage: {
-      storageSizeGB: 32
+      storageSizeGB: 256
     }
-    version: '15'
+    version: '18'
     administratorLogin: postgresUser
     administratorLoginPassword: postgresPassword
     databaseNames: [postgresDatabaseName]

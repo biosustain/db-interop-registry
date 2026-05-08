@@ -20,11 +20,11 @@ Endpoints exposed by the databases that this Interop service consumes. These cal
   - Bulk: `GET /interop-query/strains`, `GET /interop-query/genes`
   - Lookup: `POST /interop-query/query-by-gene`, `POST /interop-query/query-by-strain`
   - Pair: `POST /interop-query/query-by-pair`
-- **BiGG** (`http://biggr-prod.northeurope.cloudapp.azure.com/`)
+- **BiGG** (`https://biggr.org/`)
   - Bulk: `GET /interop-query/strains`, `GET /interop-query/genes`
   - Lookup: `POST /interop-query/query-by-gene`, `POST /interop-query/query-by-strain`
   - Pair: `POST /interop-query/query-by-pair`
-- **PanKB** (`http://pankb-preprod.northeurope.cloudapp.azure.com/`)
+- **PanKB** (`https://pankb.org/`)
   - Bulk: `GET /interop-query/strains`, `GET /interop-query/genes`
   - Lookup: `POST /interop-query/query-by-gene`, `POST /interop-query/query-by-strain`
   - Pair: `POST /interop-query/query-by-pair`
@@ -50,7 +50,7 @@ curl -s -X POST https://pmkbase.com/interop-query/query-by-strain \
   -d '{"ids": ["strain-id"]}'
 
 # Gene+strain pair lookup (BiGG)
-curl -s -X POST http://biggr-prod.northeurope.cloudapp.azure.com/interop-query/query-by-pair \
+curl -s -X POST https://biggr.org/interop-query/query-by-pair \
   -H "Content-Type: application/json" \
   -d '{"pairs": [{"gene": "gene-id", "strain": "strain-id"}]}'
 ```

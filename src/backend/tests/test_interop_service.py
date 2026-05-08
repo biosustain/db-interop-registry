@@ -47,10 +47,10 @@ def test_fetch_attributes_wraps_http_errors(monkeypatch):
 @pytest.mark.parametrize(
     ("method_name", "prefix"),
     [
-        ("_fetch_from_biggr", "http://biggr-prod.northeurope.cloudapp.azure.com/interop-query/query-by-"),
+        ("_fetch_from_biggr", "https://biggr.org/interop-query/query-by-"),
         ("_fetch_from_aledb", "https://aledb.org/interop-query/query-by-"),
         ("_fetch_from_pmkbase", "https://pmkbase.com/interop-query/query-by-"),
-        ("_fetch_from_pankb", "http://pankb-preprod.northeurope.cloudapp.azure.com/interop-query/query-by-"),
+        ("_fetch_from_pankb", "https://pankb.org/interop-query/query-by-"),
     ],
 )
 @pytest.mark.parametrize("entity_type_id, endpoint", [(1, "gene"), (2, "strain")])

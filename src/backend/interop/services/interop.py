@@ -19,9 +19,9 @@ class InteropService:
             Aggregated results broken down per external source.
         """
         sources = {
-            "biggr": "http://biggr-prod.northeurope.cloudapp.azure.com/interop-query/query-by-pair",
+            "biggr": "https://biggr.org/interop-query/query-by-pair",
             "aledb": "https://aledb.org/interop-query/query-by-pair",
-            "pankb": "http://pankb-preprod.northeurope.cloudapp.azure.com/interop-query/query-by-pair",
+            "pankb": "https://pankb.org/interop-query/query-by-pair",
         }
 
         results: dict[str, Any] = {
@@ -99,7 +99,7 @@ class InteropService:
         else:
             return {}
 
-        url = f"http://biggr-prod.northeurope.cloudapp.azure.com/interop-query/query-by-{endpoint}"
+        url = f"https://biggr.org/interop-query/query-by-{endpoint}"
         return InteropService._make_request(url, local_id)
 
     @staticmethod
@@ -125,7 +125,7 @@ class InteropService:
         else:
             return {}
 
-        url = f"http://pankb-preprod.northeurope.cloudapp.azure.com/interop-query/query-by-{endpoint}"
+        url = f"https://pankb.org/interop-query/query-by-{endpoint}"
         return InteropService._make_request(url, local_id)
 
     @staticmethod

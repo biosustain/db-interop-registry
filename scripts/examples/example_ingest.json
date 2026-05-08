@@ -17,7 +17,7 @@
       "local_id": "mrcB"
     },
     {
-      "source_db": "Pankb",
+      "source_db": "PanKB",
       "entity_type": "gene",
       "local_id": "rpoB_3"
     },    
@@ -37,7 +37,7 @@
       "local_id": "BW25113"
     },
     {
-      "source_db": "Bigg",
+      "source_db": "BiGGr",
       "entity_type": "strain",
       "local_id": "511145"
     },
